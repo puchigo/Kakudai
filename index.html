@@ -443,18 +443,22 @@
             if (!peer || peer.destroyed) {
                 peer = new Peer(requestedId || Math.floor(100000 + Math.random() * 900000).toString());
                 peer.on('open', (id) => callback(id));
-                peer.on('connection', setupConnection);
+                peer.on('connection', (conn) => setupConnection(conn, false));
             } else callback(peer.id);
         }
 
-        function setupConnection(conn) {
-            if (roomPassword && (!conn.metadata || conn.metadata.password !== roomPassword)) {
+        function setupConnection(conn, isOutgoing = false) {
+            if (!isOutgoing && roomPassword && (!conn.metadata || conn.metadata.password !== roomPassword)) {
                 conn.on('open', () => { conn.send({ type: 'auth_error' }); setTimeout(()=>conn.close(), 500); }); return;
             }
             if (connections[conn.peer]) return; 
             connections[conn.peer] = conn; friends[conn.peer] = { name: '参加者', color: '#6b7280' };
             conn.on('open', () => {
                 conn.send({ type: 'info', name: getMyName(), color: getMyColor() });
+                if (currentMarker) {
+                    const pos = currentMarker.getLatLng();
+                    conn.send({ type: 'pos', lat: pos.lat, lng: pos.lng, color: getMyColor() });
+                }
                 Object.values(pinsData).forEach(p => conn.send({ type: 'sync_pin', pin: p.data })); 
                 const others = Object.keys(connections).filter(id => id !== conn.peer);
                 if (others.length > 0) conn.send({ type: 'peers_list', ids: others });
@@ -464,7 +468,7 @@
                 if (data.type === 'auth_error') { alert('パスワード不一致'); clearSession(); return; }
                 const f = friends[conn.peer]; if(!f) return;
                 if (data.type === 'peers_list') {
-                    data.ids.forEach(id => { if (!connections[id] && id !== peer.id) setupConnection(peer.connect(id, { metadata: { password: roomPassword } })); });
+                    data.ids.forEach(id => { if (!connections[id] && id !== peer.id) setupConnection(peer.connect(id, { metadata: { password: roomPassword } }), true); });
                 } else if (data.type === 'info') {
                     f.name = data.name; f.color = data.color;
                     if (!f.routeLine) f.routeLine = L.polyline([], { color: f.color, weight: 5, opacity: 0.7 }).addTo(map);
@@ -521,7 +525,7 @@
             initPeer(null, () => { 
                 saveSession('guest', targetId, roomPassword); 
                 updateConnectionInfoDisplay('guest', targetId, roomPassword); // 情報を表示
-                setupConnection(peer.connect(targetId, { metadata: { password: roomPassword } })); 
+                setupConnection(peer.connect(targetId, { metadata: { password: roomPassword } }), true); 
             });
         });
 
@@ -592,7 +596,7 @@
                 roomPassword = session.pwd || '';
                 updateConnectionInfoDisplay(session.role, session.hostId, session.pwd); // リロード時も情報を復元
                 if (session.role === 'host') initPeer(session.hostId, () => {});
-                else if (session.role === 'guest') initPeer(null, () => setupConnection(peer.connect(session.hostId, { metadata: { password: roomPassword } })));
+                else if (session.role === 'guest') initPeer(null, () => setupConnection(peer.connect(session.hostId, { metadata: { password: roomPassword } }), true));
             }
         });
     </script>
