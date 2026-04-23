@@ -130,6 +130,12 @@
         .custom-css-pin { width: 100%; height: 100%; border-radius: 50% 50% 50% 0; background-color: var(--pin-color); transform: rotate(-45deg); border: 2px solid white; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
         .custom-css-pin::after { content: ''; position: absolute; width: 6px; height: 6px; background: white; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
+        .recent-peer-item {
+            padding: 6px; background: var(--bg-main); border: 1px solid var(--border);
+            border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center;
+        }
+        .recent-peer-item:hover { background: #e5e7eb; }
+
         @media (max-width: 768px) {
             #sidebar-wrapper {
                 top: auto; bottom: 0; left: 0; width: 100%;
@@ -249,6 +255,12 @@
         <div class="modal-title">ルームへ接続</div>
         <div class="control-group"><label>接続先ID (必須)</label><input type="text" id="connect-id-input" placeholder="相手のIDを入力"></div>
         <div class="control-group"><label>パスワード (設定されている場合)</label><input type="password" id="connect-pwd-input" placeholder="パスワードを入力"></div>
+        
+        <div class="control-group" style="margin-top: 12px;">
+            <label>最近接続したID</label>
+            <div id="recent-peers-list" style="max-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
+        </div>
+
         <div class="row-buttons" style="margin-top: 16px;">
             <button id="connect-cancel-btn" class="action-btn btn-gray">キャンセル</button>
             <button id="connect-start-btn" class="action-btn btn-blue">接続</button>
@@ -381,6 +393,30 @@
         let peer = null; let roomPassword = ''; 
         const connections = {}; const friends = {};     
 
+        let recentPeers = JSON.parse(localStorage.getItem('recentPeers') || '[]');
+        function saveRecentPeer(id) {
+            recentPeers = recentPeers.filter(p => p !== id);
+            recentPeers.unshift(id);
+            if (recentPeers.length > 5) recentPeers.pop();
+            localStorage.setItem('recentPeers', JSON.stringify(recentPeers));
+        }
+        function renderRecentPeers() {
+            const list = document.getElementById('recent-peers-list');
+            if(!list) return;
+            list.innerHTML = '';
+            if (recentPeers.length === 0) {
+                list.innerHTML = '<div style="font-size:10px; color:var(--text-sub); text-align:center;">履歴なし</div>';
+                return;
+            }
+            recentPeers.forEach(id => {
+                const item = document.createElement('div');
+                item.className = 'recent-peer-item';
+                item.innerText = id;
+                item.onclick = () => { document.getElementById('connect-id-input').value = id; };
+                list.appendChild(item);
+            });
+        }
+
         function updateConnectionInfoDisplay(role, id, pwd) {
             const infoDiv = document.getElementById('connection-info');
             if (role && id) {
@@ -439,13 +475,20 @@
 
         function initPeer(requestedId, callback) {
             if (!peer || peer.destroyed) {
-                // NAT越え用のSTUNサーバー設定を追加
+                // NAT越え用のTURNサーバー・強力なSTUNサーバー設定を追加して通信の安定性を向上
                 peer = new Peer(requestedId || Math.floor(100000 + Math.random() * 900000).toString(), {
-                    config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+                    config: { 
+                        'iceServers': [
+                            { urls: 'stun:stun.l.google.com:19302' },
+                            { urls: 'stun:stun.cloudflare.com:3478' },
+                            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
+                            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
+                            { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
+                        ] 
+                    }
                 });
                 peer.on('open', (id) => callback(id));
                 peer.on('connection', (conn) => setupConnection(conn, false));
-                // 接続エラーや相手が見つからない際のアラート処理を追加
                 peer.on('error', (err) => {
                     if (err.type === 'peer-unavailable') {
                         alert('通信相手が見つかりません。通信できないか、電源が切れています。');
@@ -463,6 +506,7 @@
             if (connections[conn.peer]) return; 
             connections[conn.peer] = conn; friends[conn.peer] = { name: '参加者', color: '#6b7280' };
             conn.on('open', () => {
+                saveRecentPeer(conn.peer);
                 conn.send({ type: 'info', name: getMyName(), color: getMyColor() });
                 if (currentMarker) {
                     const pos = currentMarker.getLatLng();
@@ -500,7 +544,6 @@
                 const f = friends[conn.peer];
                 if (f) { if (f.marker) map.removeLayer(f.marker); if (f.routeLine) map.removeLayer(f.routeLine); delete friends[conn.peer]; }
                 delete connections[conn.peer]; updateStatus();
-                // 接続が途切れた時のアラートを追加
                 alert('通信相手との接続が切れました。電源が切れたか、通信環境が不安定です。');
             });
         }
@@ -524,6 +567,7 @@
         document.getElementById('connect-btn').addEventListener('click', () => {
             document.getElementById('connect-id-input').value = '';
             document.getElementById('connect-pwd-input').value = '';
+            renderRecentPeers(); // 履歴を描画
             document.getElementById('connect-modal').classList.add('active');
             if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); }
         });
