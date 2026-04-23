@@ -41,6 +41,7 @@
             position: absolute; top: 20px; left: 0; z-index: 1050;
             transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
             pointer-events: none; /* 透明な部分はクリックを貫通させる */
+            display: flex;
         }
         #sidebar-wrapper.active { transform: translateX(0); }
 
@@ -54,9 +55,9 @@
             pointer-events: auto; /* ここはクリック判定あり */
         }
 
-        /* サイドバー開閉用タブ（外にはみ出させる） */
+        /* サイドバー開閉用タブ（角の丸みの隙間を埋めるため top: 20px に変更） */
         #sidebar-toggle-btn {
-            position: absolute; top: 0; right: -44px; width: 44px; height: 60px;
+            position: absolute; top: 20px; right: -43px; width: 44px; height: 60px;
             background: rgba(243, 244, 246, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
             border: 1px solid var(--border); border-left: none; border-radius: 0 12px 12px 0;
             box-shadow: 4px 4px 10px rgba(0,0,0,0.1);
@@ -136,10 +137,29 @@
         .custom-css-pin { width: 100%; height: 100%; border-radius: 50% 50% 50% 0; background-color: var(--pin-color); transform: rotate(-45deg); border: 2px solid white; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
         .custom-css-pin::after { content: ''; position: absolute; width: 6px; height: 6px; background: white; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
 
+        /* スマホ用デザイン */
         @media (max-width: 768px) {
-            #sidebar { width: 280px; }
+            #sidebar-wrapper {
+                top: auto; bottom: 0; left: 0; width: 100%;
+                transform: translateY(100%);
+            }
+            #sidebar-wrapper.active { transform: translateY(0); }
+            #sidebar {
+                width: 100%; max-height: 60vh; border-radius: 20px 20px 0 0;
+                border: 1px solid var(--border); border-bottom: none; border-left: none; border-right: none;
+            }
+            /* スマホのタブも角の丸みに干渉しないよう内側に少しズラす (right: 24px) */
+            #sidebar-toggle-btn {
+                top: -43px; right: 24px; width: 60px; height: 44px;
+                border-radius: 12px 12px 0 0; border: 1px solid var(--border); border-bottom: none;
+            }
+            
             #chat-panel { width: calc(100% - 32px); left: 16px; height: 45vh; }
             .leaflet-control-zoom { display: none; }
+
+            .modal {
+                top: 10%; transform: translate(-50%, 0);
+            }
         }
     </style>
 </head>
@@ -166,7 +186,10 @@
                 </div>
             </div>
 
-            <div style="display:none;" id="advanced-settings">
+            <div style="text-align:right; margin-bottom:4px;">
+                <a href="#" id="toggle-advanced" style="font-size:10px; color:var(--text-sub);">詳細設定を隠す</a>
+            </div>
+            <div style="display:block;" id="advanced-settings">
                 <div class="control-group">
                     <select id="sel-speed"><option value="kmh">時速 (km/h)</option><option value="mmin">分速 (m/min)</option><option value="ms">秒速 (m/s)</option></select>
                 </div>
@@ -177,9 +200,6 @@
                     <select id="sel-time"><option value="10">軌跡: 過去10分</option><option value="30">軌跡: 過去30分</option><option value="all">軌跡: すべて</option></select>
                 </div>
                 <button id="btn-reset" class="action-btn btn-red" style="margin-bottom:8px;">経路リセット</button>
-            </div>
-            <div style="text-align:right; margin-top:-8px; margin-bottom:4px;">
-                <a href="#" id="toggle-advanced" style="font-size:10px; color:var(--text-sub);">詳細設定</a>
             </div>
 
             <div style="border-top: 1px solid var(--border); padding-top: 12px;">
@@ -253,16 +273,32 @@
         const toggleBtn = document.getElementById('sidebar-toggle-btn');
         const chatPanel = document.getElementById('chat-panel');
         
+        // スマホかPCかでタブの矢印を出し分ける
+        function updateToggleBtn() {
+            const isActive = sidebarWrapper.classList.contains('active');
+            const isMobile = window.innerWidth <= 768;
+            if (isMobile) {
+                toggleBtn.innerText = isActive ? '▼' : '▲';
+            } else {
+                toggleBtn.innerText = isActive ? '＜' : '＞';
+            }
+        }
+
         toggleBtn.addEventListener('click', () => {
-            const isActive = sidebarWrapper.classList.toggle('active');
-            toggleBtn.innerText = isActive ? '＜' : '＞';
+            sidebarWrapper.classList.toggle('active');
+            updateToggleBtn();
             chatPanel.classList.remove('active');
         });
+        window.addEventListener('resize', updateToggleBtn);
+        updateToggleBtn(); // 初期化
 
+        // 詳細設定の開閉トグル
         document.getElementById('toggle-advanced').addEventListener('click', (e) => {
             e.preventDefault();
             const adv = document.getElementById('advanced-settings');
-            adv.style.display = adv.style.display === 'none' ? 'block' : 'none';
+            const isHidden = adv.style.display === 'none';
+            adv.style.display = isHidden ? 'block' : 'none';
+            e.target.innerText = isHidden ? '詳細設定を隠す' : '詳細設定を開く';
         });
 
         const map = L.map('map', { zoomControl: false, doubleClickZoom: false }).setView([35.6812, 139.7671], 16);
@@ -356,7 +392,14 @@
             const addItem = (name, color, latlng) => {
                 const item = document.createElement('div'); item.className = 'member-item';
                 item.innerHTML = `<div class="member-color" style="background:${color}"></div><div class="member-name">${name}</div>`;
-                item.onclick = () => { if(latlng) map.flyTo(latlng, 16); if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); toggleBtn.innerText = '＞'; } };
+                item.onclick = () => { 
+                    if(latlng) {
+                        map.flyTo(latlng, 16); 
+                        if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); } 
+                    } else {
+                        alert('まだ位置情報が取得できていません');
+                    }
+                };
                 list.appendChild(item);
             };
             addItem(getMyName() + ' (自分)', getMyColor(), currentMarker ? currentMarker.getLatLng() : null);
@@ -417,6 +460,7 @@
                         f.marker = L.marker([data.lat, data.lng], {icon: getPulseIcon(data.color)}).addTo(map);
                         f.marker.bindTooltip(f.name, {permanent: true, direction: 'top', offset: [0, -8], className: 'name-tooltip'}).openTooltip();
                     } else f.marker.setLatLng([data.lat, data.lng]);
+                    updateMemberList(); 
                 } else if (data.type === 'chat') { appendMessage(data.text, false, data.name, data.color);
                 } else if (data.type === 'sync_pin') { renderPin(data.pin);
                 } else if (data.type === 'delete_pin') { if (pinsData[data.id]) { map.removeLayer(pinsData[data.id].marker); delete pinsData[data.id]; } }
@@ -432,7 +476,7 @@
         document.getElementById('host-btn').addEventListener('click', () => {
             document.getElementById('host-pwd-input').value = '';
             document.getElementById('host-modal').classList.add('active');
-            if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); toggleBtn.innerText = '＞'; }
+            if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); }
         });
         document.getElementById('host-cancel-btn').addEventListener('click', () => document.getElementById('host-modal').classList.remove('active'));
         document.getElementById('host-start-btn').addEventListener('click', () => {
@@ -446,7 +490,7 @@
             document.getElementById('connect-id-input').value = '';
             document.getElementById('connect-pwd-input').value = '';
             document.getElementById('connect-modal').classList.add('active');
-            if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); toggleBtn.innerText = '＞'; }
+            if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); }
         });
         document.getElementById('connect-cancel-btn').addEventListener('click', () => document.getElementById('connect-modal').classList.remove('active'));
         document.getElementById('connect-start-btn').addEventListener('click', () => {
@@ -461,7 +505,7 @@
 
         const chatBadge = document.getElementById('chat-badge'); const chatMessages = document.getElementById('chat-messages'); const chatInput = document.getElementById('chat-input'); let unreadCount = 0;
         document.getElementById('floating-chat-btn').addEventListener('click', () => {
-            chatPanel.classList.add('active'); sidebarWrapper.classList.remove('active'); toggleBtn.innerText = '＞';
+            chatPanel.classList.add('active'); sidebarWrapper.classList.remove('active'); updateToggleBtn();
             unreadCount = 0; chatBadge.style.display = 'none';
         });
         document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.remove('active'));
@@ -497,6 +541,7 @@
                 currentMarker = L.marker([lat, lng], {icon: getPulseIcon(getMyColor())}).addTo(map);
                 currentMarker.bindTooltip(getMyName(), {permanent: true, direction: 'top', offset: [0, -8], className: 'name-tooltip'}).openTooltip();
                 map.flyTo([lat, lng], 16);
+                updateMemberList(); 
             } else currentMarker.setLatLng([lat, lng]);
 
             const myLatLng = L.latLng(lat, lng);
