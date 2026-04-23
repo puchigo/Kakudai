@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
     <meta name="referrer" content="no-referrer-when-downgrade" />
-    <title>位置共有システム (フルカスタムUI版)</title>
+    <title>位置共有システム (ダイレクト接続版)</title>
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <style>
         :root {
@@ -68,7 +68,7 @@
 
         .control-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
         .control-group label { font-size: 11px; font-weight: 600; color: var(--text-sub); }
-        select, input[type="text"], input[type="color"], input[type="password"] {
+        select, input[type="text"], input[type="color"] {
             width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
             background: #fff; font-size: 12px; box-sizing: border-box; outline: none; appearance: auto;
         }
@@ -161,15 +161,29 @@
 
     <button id="floating-chat-btn" class="floating-btn">チャット<div id="chat-badge" class="badge">0</div></button>
 
-    <div id="sidebar-wrapper">
+    <div id="sidebar-wrapper" class="active">
         <div id="sidebar-toggle-btn">＞</div>
         <div id="sidebar">
-            <div class="control-group">
-                <label>接続メンバー</label>
+            
+            <div id="connection-info" style="background: #e0f2fe; border: 1px solid #bae6fd; padding: 10px; border-radius: 8px; text-align: center;">
+                <div style="font-size: 11px; font-weight: bold; color: var(--primary);">あなたのID</div>
+                <div style="font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 4px 0;" id="my-peer-id">読込中...</div>
+                <button id="copy-my-id-btn" class="action-btn btn-light" style="padding: 6px; font-size: 11px;">自分のIDをコピー</button>
+            </div>
+
+            <div class="row-buttons" style="margin-top: 8px;">
+                <button id="connect-btn" class="action-btn btn-blue">友達のIDを追加</button>
+                <button id="disconnect-btn" class="action-btn btn-red">全切断</button>
+            </div>
+            
+            <div id="status-text">待機中</div>
+
+            <div class="control-group" style="margin-top: 12px;">
+                <label>接続中のメンバー</label>
                 <div id="member-list"></div>
             </div>
 
-            <div style="display:flex; gap:10px;">
+            <div style="display:flex; gap:10px; margin-top: 8px;">
                 <div class="data-card" style="flex:1;">
                     <div class="data-label">現在速度</div>
                     <div class="data-value" id="val-speed">0.0 <span class="data-unit">km/h</span></div>
@@ -180,7 +194,7 @@
                 </div>
             </div>
 
-            <div style="text-align:right; margin-bottom:4px;">
+            <div style="text-align:right; margin-bottom:4px; margin-top: 8px;">
                 <a href="#" id="toggle-advanced" style="font-size:10px; color:var(--text-sub);">詳細設定を隠す</a>
             </div>
             <div style="display:block;" id="advanced-settings">
@@ -194,24 +208,7 @@
                     <select id="sel-time"><option value="10">軌跡: 過去10分</option><option value="30">軌跡: 過去30分</option><option value="all">軌跡: すべて</option></select>
                 </div>
                 <button id="btn-reset" class="action-btn btn-red" style="margin-bottom:8px;">経路リセット</button>
-            </div>
-
-            <div style="border-top: 1px solid var(--border); padding-top: 12px;">
-                <div class="row-buttons">
-                    <button id="host-btn" class="action-btn btn-blue" style="background:#059669;">ID発行</button>
-                    <button id="connect-btn" class="action-btn btn-blue">接続</button>
-                    <button id="disconnect-btn" class="action-btn btn-red">切断</button>
-                </div>
-
-                <div id="connection-info" style="display:none; background: #e0f2fe; border: 1px solid #bae6fd; padding: 10px; border-radius: 8px; margin-top: 8px;">
-                    <div style="font-size: 11px; font-weight: bold; color: var(--primary); margin-bottom: 2px;">現在のルーム情報</div>
-                    <div style="font-size: 14px; font-weight: 800; letter-spacing: 1px; user-select: all;" id="info-room-id">ID: </div>
-                    <div style="font-size: 12px; font-weight: 600; color: var(--text-sub); user-select: all;" id="info-room-pwd">PASS: </div>
-                    <button id="copy-info-btn" class="action-btn btn-light" style="padding: 6px; font-size: 11px; margin-top: 6px;">IDとPASSをコピー</button>
-                </div>
-
-                <button id="open-settings-btn" class="action-btn btn-gray" style="margin-top:8px;">プロフィール設定</button>
-                <div id="status-text">未接続</div>
+                <button id="open-settings-btn" class="action-btn btn-gray">プロフィール設定</button>
             </div>
         </div>
     </div>
@@ -242,19 +239,9 @@
         </div>
     </div>
 
-    <div id="host-modal" class="modal">
-        <div class="modal-title">ルームの作成</div>
-        <div class="control-group"><label>パスワード (空欄でパスワードなし)</label><input type="password" id="host-pwd-input" placeholder="任意のパスワード"></div>
-        <div class="row-buttons" style="margin-top: 16px;">
-            <button id="host-cancel-btn" class="action-btn btn-gray">キャンセル</button>
-            <button id="host-start-btn" class="action-btn btn-blue" style="background:#059669;">ID発行</button>
-        </div>
-    </div>
-
     <div id="connect-modal" class="modal">
-        <div class="modal-title">ルームへ接続</div>
-        <div class="control-group"><label>接続先ID (必須)</label><input type="text" id="connect-id-input" placeholder="相手のIDを入力"></div>
-        <div class="control-group"><label>パスワード (設定されている場合)</label><input type="password" id="connect-pwd-input" placeholder="パスワードを入力"></div>
+        <div class="modal-title">友達のIDを入力して接続</div>
+        <div class="control-group"><label>接続先ID</label><input type="text" id="connect-id-input" placeholder="例: 123456"></div>
         
         <div class="control-group" style="margin-top: 12px;">
             <label>最近接続したID</label>
@@ -272,8 +259,8 @@
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <script>
-        // イベント伝播を防ぐ処理
-        ['sidebar-wrapper', 'settings-modal', 'pin-modal', 'host-modal', 'connect-modal', 'chat-panel', 'floating-chat-btn'].forEach(id => {
+        // UI操作の伝播防止
+        ['sidebar-wrapper', 'settings-modal', 'pin-modal', 'connect-modal', 'chat-panel', 'floating-chat-btn'].forEach(id => {
             L.DomEvent.disableClickPropagation(document.getElementById(id));
         });
 
@@ -390,8 +377,12 @@
             pinModal.classList.remove('active'); tempPinLatLng = null;
         });
 
-        let peer = null; let roomPassword = ''; 
-        const connections = {}; const friends = {};     
+        // ============================
+        // P2P メッシュネットワーク通信
+        // ============================
+        let peer = null; 
+        const connections = {}; 
+        const friends = {};     
 
         let recentPeers = JSON.parse(localStorage.getItem('recentPeers') || '[]');
         function saveRecentPeer(id) {
@@ -405,36 +396,22 @@
             if(!list) return;
             list.innerHTML = '';
             if (recentPeers.length === 0) {
-                list.innerHTML = '<div style="font-size:10px; color:var(--text-sub); text-align:center;">履歴なし</div>';
-                return;
+                list.innerHTML = '<div style="font-size:10px; color:var(--text-sub); text-align:center;">履歴なし</div>'; return;
             }
             recentPeers.forEach(id => {
                 const item = document.createElement('div');
-                item.className = 'recent-peer-item';
-                item.innerText = id;
+                item.className = 'recent-peer-item'; item.innerText = id;
                 item.onclick = () => { document.getElementById('connect-id-input').value = id; };
                 list.appendChild(item);
             });
         }
 
-        function updateConnectionInfoDisplay(role, id, pwd) {
-            const infoDiv = document.getElementById('connection-info');
-            if (role && id) {
-                infoDiv.style.display = 'block';
-                document.getElementById('info-room-id').innerText = `ID: ${id}`;
-                document.getElementById('info-room-pwd').innerText = pwd ? `PASS: ${pwd}` : 'PASS: なし';
-            } else {
-                infoDiv.style.display = 'none';
-            }
-        }
-
-        document.getElementById('copy-info-btn').addEventListener('click', () => {
-            const idText = document.getElementById('info-room-id').innerText;
-            const pwdText = document.getElementById('info-room-pwd').innerText;
-            navigator.clipboard.writeText(`${idText}\n${pwdText}`).then(() => {
-                const btn = document.getElementById('copy-info-btn');
+        document.getElementById('copy-my-id-btn').addEventListener('click', () => {
+            const myIdText = document.getElementById('my-peer-id').innerText;
+            navigator.clipboard.writeText(myIdText).then(() => {
+                const btn = document.getElementById('copy-my-id-btn');
                 btn.innerText = 'コピーしました！';
-                setTimeout(() => btn.innerText = 'IDとPASSをコピー', 2000);
+                setTimeout(() => btn.innerText = '自分のIDをコピー', 2000);
             }).catch(() => alert('コピーに失敗しました'));
         });
 
@@ -444,12 +421,7 @@
                 const item = document.createElement('div'); item.className = 'member-item';
                 item.innerHTML = `<div class="member-color" style="background:${color}"></div><div class="member-name">${name}</div>`;
                 item.onclick = () => { 
-                    if(latlng) {
-                        map.flyTo(latlng, 16); 
-                        if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); } 
-                    } else {
-                        alert('まだ位置情報が取得できていません');
-                    }
+                    if(latlng) { map.flyTo(latlng, 16); if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); } }
                 };
                 list.appendChild(item);
             };
@@ -459,69 +431,90 @@
 
         function updateStatus() {
             const count = Object.keys(connections).length;
-            document.getElementById('status-text').innerText = count > 0 ? `${count}人と接続中` : '未接続';
+            document.getElementById('status-text').innerText = count > 0 ? `${count}人と接続中` : '待機中... (友達にIDを教えるか入力してね)';
             updateMemberList();
         }
 
         function broadcast(payload) { Object.values(connections).forEach(c => { if(c.open) c.send(payload); }); }
 
-        function saveSession(role, hostId, pwd) { localStorage.setItem('peerSession', JSON.stringify({ role, hostId, pwd })); }
-        function clearSession() {
-            localStorage.removeItem('peerSession');
+        function disconnectAll() {
             Object.values(connections).forEach(c => c.close());
-            if(peer) peer.destroy(); peer = null; updateStatus(); alert('切断しました。');
-            updateConnectionInfoDisplay(null, null, null);
+            updateStatus(); alert('全員との接続を切断しました。');
         }
 
-        function initPeer(requestedId, callback) {
-            if (!peer || peer.destroyed) {
-                // NAT越え用のTURNサーバー・強力なSTUNサーバー設定を追加して通信の安定性を向上
-                peer = new Peer(requestedId || Math.floor(100000 + Math.random() * 900000).toString(), {
-                    config: { 
-                        'iceServers': [
-                            { urls: 'stun:stun.l.google.com:19302' },
-                            { urls: 'stun:stun.cloudflare.com:3478' },
-                            { urls: 'turn:openrelay.metered.ca:80', username: 'openrelayproject', credential: 'openrelayproject' },
-                            { urls: 'turn:openrelay.metered.ca:443', username: 'openrelayproject', credential: 'openrelayproject' },
-                            { urls: 'turn:openrelay.metered.ca:443?transport=tcp', username: 'openrelayproject', credential: 'openrelayproject' }
-                        ] 
+        // 自分のIDを固定化（ブラウザを閉じても次回同じIDになるように）
+        function initPeer() {
+            let myStoredId = localStorage.getItem('myP2PId') || Math.floor(100000 + Math.random() * 900000).toString();
+            localStorage.setItem('myP2PId', myStoredId);
+
+            peer = new Peer(myStoredId, {
+                config: { 
+                    'iceServers': [
+                        { urls: 'stun:stun.l.google.com:19302' },
+                        { urls: 'stun:stun.cloudflare.com:3478' }
+                    ] 
+                }
+            });
+
+            peer.on('open', (id) => {
+                document.getElementById('my-peer-id').innerText = id;
+                updateStatus();
+                // ページを開き直した時に自動復帰するため、最近の接続先にアタック
+                recentPeers.forEach(peerId => {
+                    if (peerId !== id && !connections[peerId]) {
+                        setupConnection(peer.connect(peerId));
                     }
                 });
-                peer.on('open', (id) => callback(id));
-                peer.on('connection', (conn) => setupConnection(conn, false));
-                peer.on('error', (err) => {
-                    if (err.type === 'peer-unavailable') {
-                        alert('通信相手が見つかりません。通信できないか、電源が切れています。');
-                    } else if (err.type === 'network' || err.type === 'server-error') {
-                        alert('サーバーとの通信エラーです。通信環境を確認してください。');
-                    }
-                });
-            } else callback(peer.id);
+            });
+
+            peer.on('connection', (conn) => setupConnection(conn));
+            
+            peer.on('error', (err) => {
+                if (err.type === 'unavailable-id') {
+                    // もしIDが被ってたら新しく作り直す
+                    localStorage.removeItem('myP2PId');
+                    peer.destroy();
+                    initPeer();
+                }
+            });
+            peer.on('disconnected', () => { setTimeout(() => { if (peer && !peer.destroyed) peer.reconnect(); }, 3000); });
         }
 
-        function setupConnection(conn, isOutgoing = false) {
-            if (!isOutgoing && roomPassword && (!conn.metadata || conn.metadata.password !== roomPassword)) {
-                conn.on('open', () => { conn.send({ type: 'auth_error' }); setTimeout(()=>conn.close(), 500); }); return;
-            }
-            if (connections[conn.peer]) return; 
-            connections[conn.peer] = conn; friends[conn.peer] = { name: '参加者', color: '#6b7280' };
+        function setupConnection(conn) {
+            // 既に接続済み、または自分自身なら無視
+            if (connections[conn.peer] || conn.peer === peer.id) return;
+            
+            connections[conn.peer] = conn; 
+            if (!friends[conn.peer]) friends[conn.peer] = { name: '接続中...', color: '#6b7280' };
+            
             conn.on('open', () => {
                 saveRecentPeer(conn.peer);
+                
+                // 自分の情報を送る
                 conn.send({ type: 'info', name: getMyName(), color: getMyColor() });
                 if (currentMarker) {
                     const pos = currentMarker.getLatLng();
                     conn.send({ type: 'pos', lat: pos.lat, lng: pos.lng, color: getMyColor() });
                 }
                 Object.values(pinsData).forEach(p => conn.send({ type: 'sync_pin', pin: p.data })); 
-                const others = Object.keys(connections).filter(id => id !== conn.peer);
-                if (others.length > 0) conn.send({ type: 'peers_list', ids: others });
+                
+                // フルメッシュの肝: 自分の知っている他の友達のIDリストを教える
+                const knownPeers = Object.keys(connections).filter(id => id !== conn.peer);
+                if (knownPeers.length > 0) conn.send({ type: 'peers_list', ids: knownPeers });
+                
                 updateStatus();
             });
+
             conn.on('data', (data) => {
-                if (data.type === 'auth_error') { alert('パスワード不一致'); clearSession(); return; }
                 const f = friends[conn.peer]; if(!f) return;
+
+                // フルメッシュの肝2: 教えてもらった友達リストにまだ繋がってない人がいたら繋ぎに行く
                 if (data.type === 'peers_list') {
-                    data.ids.forEach(id => { if (!connections[id] && id !== peer.id) setupConnection(peer.connect(id, { metadata: { password: roomPassword } }), true); });
+                    data.ids.forEach(id => {
+                        if (!connections[id] && id !== peer.id) {
+                            setupConnection(peer.connect(id));
+                        }
+                    });
                 } else if (data.type === 'info') {
                     f.name = data.name; f.color = data.color;
                     if (!f.routeLine) f.routeLine = L.polyline([], { color: f.color, weight: 5, opacity: 0.7 }).addTo(map);
@@ -540,51 +533,33 @@
                 } else if (data.type === 'sync_pin') { renderPin(data.pin);
                 } else if (data.type === 'delete_pin') { if (pinsData[data.id]) { map.removeLayer(pinsData[data.id].marker); delete pinsData[data.id]; } }
             });
+
             conn.on('close', () => {
                 const f = friends[conn.peer];
                 if (f) { if (f.marker) map.removeLayer(f.marker); if (f.routeLine) map.removeLayer(f.routeLine); delete friends[conn.peer]; }
                 delete connections[conn.peer]; updateStatus();
-                alert('通信相手との接続が切れました。電源が切れたか、通信環境が不安定です。');
             });
         }
 
-        document.getElementById('host-btn').addEventListener('click', () => {
-            document.getElementById('host-pwd-input').value = '';
-            document.getElementById('host-modal').classList.add('active');
-            if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); }
-        });
-        document.getElementById('host-cancel-btn').addEventListener('click', () => document.getElementById('host-modal').classList.remove('active'));
-        document.getElementById('host-start-btn').addEventListener('click', () => {
-            roomPassword = document.getElementById('host-pwd-input').value.trim();
-            document.getElementById('host-modal').classList.remove('active');
-            initPeer(null, (id) => { 
-                saveSession('host', id, roomPassword); 
-                updateConnectionInfoDisplay('host', id, roomPassword); 
-                alert(`ID: ${id}\nPASS: ${roomPassword||'なし'}`); 
-            });
-        });
-
         document.getElementById('connect-btn').addEventListener('click', () => {
             document.getElementById('connect-id-input').value = '';
-            document.getElementById('connect-pwd-input').value = '';
-            renderRecentPeers(); // 履歴を描画
+            renderRecentPeers();
             document.getElementById('connect-modal').classList.add('active');
             if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); }
         });
+        
         document.getElementById('connect-cancel-btn').addEventListener('click', () => document.getElementById('connect-modal').classList.remove('active'));
+        
         document.getElementById('connect-start-btn').addEventListener('click', () => {
             const targetId = document.getElementById('connect-id-input').value.trim();
-            if (!targetId) { alert('接続先IDを入力してください'); return; }
-            roomPassword = document.getElementById('connect-pwd-input').value.trim();
+            if (!targetId) { alert('相手のIDを入力してください'); return; }
+            if (targetId === peer.id) { alert('自分のIDです'); return; }
+            
             document.getElementById('connect-modal').classList.remove('active');
-            initPeer(null, () => { 
-                saveSession('guest', targetId, roomPassword); 
-                updateConnectionInfoDisplay('guest', targetId, roomPassword); 
-                setupConnection(peer.connect(targetId, { metadata: { password: roomPassword } }), true); 
-            });
+            setupConnection(peer.connect(targetId)); 
         });
 
-        document.getElementById('disconnect-btn').addEventListener('click', clearSession);
+        document.getElementById('disconnect-btn').addEventListener('click', disconnectAll);
 
         const chatBadge = document.getElementById('chat-badge'); const chatMessages = document.getElementById('chat-messages'); const chatInput = document.getElementById('chat-input'); let unreadCount = 0;
         document.getElementById('floating-chat-btn').addEventListener('click', () => {
@@ -646,13 +621,7 @@
 
         window.addEventListener('DOMContentLoaded', () => {
             updateMemberList();
-            const session = JSON.parse(localStorage.getItem('peerSession'));
-            if (session) {
-                roomPassword = session.pwd || '';
-                updateConnectionInfoDisplay(session.role, session.hostId, session.pwd);
-                if (session.role === 'host') initPeer(session.hostId, () => {});
-                else if (session.role === 'guest') initPeer(null, () => setupConnection(peer.connect(session.hostId, { metadata: { password: roomPassword } }), true));
-            }
+            initPeer(); // ページ読み込み時に自分のIDを確定させる
         });
     </script>
 </body>
