@@ -1,0 +1,535 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+    <title>位置共有およびチャットシステム</title>
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        :root {
+            --primary: #2563eb; --danger: #dc2626; --bg-main: #f3f4f6;
+            --text-main: #1f2937; --text-sub: #4b5563; --border: #e5e7eb;
+            --card-bg: #ffffff;
+        }
+
+        body, html {
+            margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+            background-color: var(--bg-main); color: var(--text-main);
+        }
+        
+        #map { height: 100%; width: 100%; z-index: 1; }
+
+        /* 左側サイドバー（PC時） */
+        #sidebar {
+            position: absolute; top: 20px; left: 20px; z-index: 1000;
+            display: flex; flex-direction: column; gap: 16px;
+            width: 320px; max-height: calc(100vh - 40px); overflow-y: auto;
+            background: rgba(243, 244, 246, 0.85); backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+            padding: 20px; border-radius: 16px; box-shadow: 0 10px 25px rgba(0, 0, 0, 0.05);
+            box-sizing: border-box; transition: all 0.3s ease;
+        }
+
+        .data-card {
+            background: var(--card-bg); padding: 16px; border-radius: 12px;
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.02);
+            border: 1px solid var(--border);
+        }
+
+        .data-label { font-size: 11px; font-weight: 600; color: var(--text-sub); margin-bottom: 4px; }
+        .data-value { font-size: 28px; font-weight: 800; color: var(--text-main); }
+        .data-unit { font-size: 14px; font-weight: 600; margin-left: 2px; }
+
+        .control-group { display: flex; flex-direction: column; gap: 6px; margin-bottom: 12px; }
+        .control-group label { font-size: 11px; font-weight: 600; color: var(--text-sub); }
+        select, input[type="text"], input[type="color"] {
+            width: 100%; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--border);
+            background: #fff; color: var(--text-main); font-size: 13px; box-sizing: border-box; outline: none;
+            appearance: auto;
+        }
+        select:focus, input:focus { border-color: var(--primary); }
+
+        button {
+            border: none; padding: 12px; font-size: 13px; font-weight: 700; color: white;
+            border-radius: 8px; cursor: pointer; transition: all 0.2s;
+            display: flex; align-items: center; justify-content: center; width: 100%;
+        }
+        button:hover { opacity: 0.9; transform: translateY(-1px); }
+        button:active { transform: translateY(1px); }
+        
+        .btn-red { background: var(--danger); }
+        .btn-blue { background: var(--primary); }
+        .btn-gray { background: #6b7280; }
+
+        .row-buttons { display: flex; gap: 8px; }
+        .row-buttons button { flex: 1; padding: 10px; font-size: 12px; }
+
+        #status-text { font-size: 11px; text-align: center; font-weight: 700; color: var(--text-sub); margin-top: -4px; }
+
+        /* チャット関連 */
+        #floating-chat-btn {
+            position: absolute; right: 20px; bottom: 20px; width: 100px; height: 44px;
+            border-radius: 22px; background: var(--primary); font-size: 13px; z-index: 1000;
+            box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3); transition: all 0.3s ease;
+        }
+        .badge {
+            position: absolute; top: -6px; right: -6px; background: var(--danger); color: white;
+            font-size: 10px; font-weight: bold; width: 20px; height: 20px; border-radius: 50%;
+            display: none; justify-content: center; align-items: center;
+        }
+
+        #chat-panel {
+            position: absolute; right: 20px; bottom: 74px; width: 320px; height: 400px;
+            background: var(--card-bg); border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
+            display: none; flex-direction: column; z-index: 1001; border: 1px solid var(--border); overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        #chat-panel.active { display: flex; }
+        
+        .chat-header { padding: 14px; font-size: 14px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; background: #f9fafb; }
+        #chat-messages { flex: 1; padding: 14px; overflow-y: auto; display: flex; flex-direction: column; gap: 10px; }
+        .msg { max-width: 85%; padding: 8px 12px; border-radius: 12px; font-size: 13px; line-height: 1.4; word-break: break-all; }
+        .msg-self { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
+        .msg-friend { align-self: flex-start; background: #f3f4f6; color: var(--text-main); border-bottom-left-radius: 2px; }
+        .msg-friend-name { font-size: 10px; font-weight: bold; margin-bottom: 4px; }
+        
+        .chat-input-area { padding: 10px; border-top: 1px solid var(--border); display: flex; gap: 8px; background: #f9fafb; }
+        #chat-input { flex: 1; }
+        #chat-send { width: 60px; padding: 10px; border-radius: 8px; }
+
+        /* 設定モーダル */
+        #settings-modal {
+            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+            width: 300px; padding: 24px; z-index: 2000; display: none;
+            background: var(--card-bg); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
+            border: 1px solid var(--border); box-sizing: border-box;
+        }
+        #settings-modal.active { display: block; }
+        .modal-header { font-size: 16px; font-weight: bold; margin-bottom: 16px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+
+        /* マップアイコン＆ピン */
+        .transparent-icon { background: none; border: none; }
+        .pulse-marker-wrapper { position: relative; width: 18px; height: 18px; }
+        .pulse-marker { width: 100%; height: 100%; background-color: var(--marker-color); border: 2px solid white; border-radius: 50%; position: absolute; z-index: 2; box-shadow: 0 0 4px rgba(0,0,0,0.2); }
+        .name-tooltip { background: white; color: black; border: 1px solid var(--border); border-radius: 4px; font-weight: bold; font-size: 11px; padding: 2px 6px; box-shadow: 0 2px 4px rgba(0,0,0,0.1); }
+        .name-tooltip::before { display: none; }
+
+        .custom-css-pin-wrapper { position: relative; width: 28px; height: 28px; }
+        .custom-css-pin { width: 100%; height: 100%; border-radius: 50% 50% 50% 0; background-color: var(--pin-color); transform: rotate(-45deg); border: 2px solid white; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
+        .custom-css-pin::after { content: ''; position: absolute; width: 8px; height: 8px; background: white; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+
+        /* 縦画面（スマホ等）のレスポンシブ対応 */
+        @media (max-width: 768px), (orientation: portrait) {
+            #sidebar { 
+                top: auto; bottom: 16px; left: 16px; 
+                width: calc(100% - 32px); 
+                max-height: 40vh;
+            }
+            #floating-chat-btn { 
+                bottom: calc(40vh + 24px); 
+                right: 16px;
+            }
+            #chat-panel { 
+                bottom: calc(40vh + 24px); 
+                width: calc(100% - 32px); 
+                left: 16px; 
+                height: 40vh;
+            }
+            .leaflet-control-zoom { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <div id="sidebar">
+        <div class="data-card">
+            <div class="data-label">現在速度</div>
+            <div class="data-value" id="val-speed">0.0 <span class="data-unit" id="unit-speed-label">km/h</span></div>
+        </div>
+        
+        <div class="data-card">
+            <div class="data-label">移動距離 (表示範囲)</div>
+            <div class="data-value" id="val-dist">0.00 <span class="data-unit" id="unit-dist-label">km</span></div>
+        </div>
+
+        <div>
+            <div class="control-group">
+                <label>速度単位</label>
+                <select id="sel-speed">
+                    <option value="kmh">時速 (km/h)</option>
+                    <option value="mmin">分速 (m/min)</option>
+                    <option value="ms">秒速 (m/s)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>距離単位</label>
+                <select id="sel-dist">
+                    <option value="km">キロメートル (km)</option>
+                    <option value="m">メートル (m)</option>
+                </select>
+            </div>
+            
+            <div class="control-group">
+                <label>経路の表示期間</label>
+                <select id="sel-time">
+                    <option value="10">過去 10分</option>
+                    <option value="30">過去 30分</option>
+                    <option value="60">過去 1時間</option>
+                    <option value="all">すべて</option>
+                </select>
+            </div>
+
+            <button id="btn-reset" class="btn-red">経路リセット</button>
+        </div>
+
+        <div style="border-top: 1px solid var(--border); padding-top: 16px; margin-top: 4px;">
+            <div class="control-group">
+                <label>通信設定</label>
+                <div class="row-buttons">
+                    <button id="host-btn" class="btn-blue" style="background:#059669;">ID発行</button>
+                    <button id="connect-btn" class="btn-blue">接続</button>
+                    <button id="open-settings-btn" class="btn-gray">設定</button>
+                </div>
+            </div>
+            <div id="status-text">未接続</div>
+        </div>
+    </div>
+
+    <button id="floating-chat-btn">チャット<div id="chat-badge" class="badge">0</div></button>
+
+    <div id="chat-panel">
+        <div class="chat-header">
+            <span>メッセージ</span>
+            <span id="close-chat-btn" style="cursor:pointer; color:var(--text-sub);">閉じる</span>
+        </div>
+        <div id="chat-messages"></div>
+        <div class="chat-input-area">
+            <input type="text" id="chat-input" placeholder="入力...">
+            <button id="chat-send" class="btn-blue">送信</button>
+        </div>
+    </div>
+
+    <div id="settings-modal">
+        <div class="modal-header">ユーザー設定</div>
+        <div class="control-group">
+            <label>名前</label>
+            <input type="text" id="user-name" maxlength="12">
+        </div>
+        <div class="control-group">
+            <label>テーマカラー (ピン・軌跡の色)</label>
+            <input type="color" id="user-color">
+        </div>
+        <button id="close-settings-btn" class="btn-blue" style="margin-top: 16px;">保存して閉じる</button>
+    </div>
+    
+    <div id="map"></div>
+
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <script>
+        // UIクリック時のマップ誤作動防止
+        ['sidebar', 'settings-modal', 'chat-panel', 'floating-chat-btn'].forEach(id => {
+            L.DomEvent.disableClickPropagation(document.getElementById(id));
+        });
+
+        // エラーの出ない美しいライトマップ (CartoDB Positron) 
+        const map = L.map('map', { zoomControl: false, doubleClickZoom: false }).setView([35.681236, 139.767125], 16);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png', { 
+            maxZoom: 20, 
+            attribution: '&copy; OpenStreetMap contributors &copy; CARTO'
+        }).addTo(map);
+        L.control.zoom({ position: 'topright' }).addTo(map);
+
+        // --- 設定管理 ---
+        const settings = JSON.parse(localStorage.getItem('mapSettings') || '{}');
+        const userNameInput = document.getElementById('user-name');
+        const userColorInput = document.getElementById('user-color');
+        const settingsModal = document.getElementById('settings-modal');
+
+        userNameInput.value = settings.userName || 'ユーザー';
+        userColorInput.value = settings.userColor || '#2563eb';
+
+        document.getElementById('open-settings-btn').addEventListener('click', () => settingsModal.classList.add('active'));
+        document.getElementById('close-settings-btn').addEventListener('click', () => {
+            settingsModal.classList.remove('active');
+            saveSettings();
+        });
+
+        // --- 単位と表示制御ロジック ---
+        let currentSpeedMS = 0; // 秒速 (m/s)
+        let routeHistory = []; 
+        
+        const selSpeed = document.getElementById('sel-speed');
+        const selDist = document.getElementById('sel-dist');
+        const selTime = document.getElementById('sel-time');
+        
+        const valSpeed = document.getElementById('val-speed');
+        const valDist = document.getElementById('val-dist');
+        const lblSpeedUnit = document.getElementById('unit-speed-label');
+        const lblDistUnit = document.getElementById('unit-dist-label');
+
+        function updateDisplay() {
+            // --- 速度の計算 ---
+            let speedStr = "0.0";
+            if (selSpeed.value === 'kmh') {
+                speedStr = (currentSpeedMS * 3.6).toFixed(1); // 時速
+                lblSpeedUnit.innerText = "km/h";
+            } else if (selSpeed.value === 'mmin') {
+                speedStr = (currentSpeedMS * 60).toFixed(0); // 分速 (わかりやすく整数)
+                lblSpeedUnit.innerText = "m/min";
+            } else if (selSpeed.value === 'ms') {
+                speedStr = currentSpeedMS.toFixed(1); // 秒速
+                lblSpeedUnit.innerText = "m/s";
+            }
+            valSpeed.innerHTML = `${speedStr} <span class="data-unit">${lblSpeedUnit.innerText}</span>`;
+
+            // --- 経路のフィルタリングと距離計算 ---
+            const now = Date.now();
+            let durationLimit = 0;
+            if (selTime.value !== 'all') {
+                durationLimit = now - (parseInt(selTime.value) * 60000);
+            }
+
+            let displayPathLatLngs = [];
+            let totalMeters = 0;
+            let validHistory = [];
+
+            for (let i = 0; i < routeHistory.length; i++) {
+                const pt = routeHistory[i];
+                if (pt.timestamp >= durationLimit || selTime.value === 'all') {
+                    validHistory.push(pt);
+                    displayPathLatLngs.push([pt.lat, pt.lng]);
+                    if (validHistory.length > 1) {
+                        const prev = validHistory[validHistory.length - 2];
+                        totalMeters += map.distance([prev.lat, prev.lng], [pt.lat, pt.lng]);
+                    }
+                }
+            }
+
+            myRouteLine.setLatLngs(displayPathLatLngs);
+
+            // --- 距離の計算 ---
+            let distStr = "0.00";
+            if (selDist.value === 'km') {
+                distStr = (totalMeters / 1000).toFixed(2);
+                lblDistUnit.innerText = "km";
+            } else if (selDist.value === 'm') {
+                distStr = totalMeters.toFixed(0); // メートル (わかりやすく整数)
+                lblDistUnit.innerText = "m";
+            }
+            valDist.innerHTML = `${distStr} <span class="data-unit">${lblDistUnit.innerText}</span>`;
+        }
+
+        selSpeed.addEventListener('change', updateDisplay);
+        selDist.addEventListener('change', updateDisplay);
+        selTime.addEventListener('change', updateDisplay);
+
+        // --- マップ描画要素 (ピン・マーカー・経路) ---
+        let currentMarker = null; let friendMarker = null;
+        let friendName = '相手';
+        let myRouteLine = L.polyline([], { color: getMyColor(), weight: 5, opacity: 0.7 }).addTo(map);
+        let friendRouteLine = L.polyline([], { color: '#dc2626', weight: 5, opacity: 0.7 }).addTo(map);
+        const pinsData = {}; 
+
+        const getPulseIcon = (color) => L.divIcon({ className: 'transparent-icon', html: `<div class="pulse-marker-wrapper" style="--marker-color: ${color};"><div class="pulse-marker"></div></div>`, iconSize: [18, 18], iconAnchor: [9, 9] });
+        const getPinIcon = (color) => L.divIcon({ className: 'transparent-icon', html: `<div class="custom-css-pin-wrapper" style="--pin-color: ${color};"><div class="custom-css-pin"></div></div>`, iconSize: [28, 28], iconAnchor: [14, 28], popupAnchor: [0, -28] });
+
+        function getMyName() { return userNameInput.value.trim() || 'ユーザー'; }
+        function getMyColor() { return userColorInput.value; }
+
+        // --- ピン管理処理 ---
+        function renderPin(pin) {
+            if (pinsData[pin.id]) map.removeLayer(pinsData[pin.id].marker);
+            const marker = L.marker([pin.lat, pin.lng], {icon: getPinIcon(pin.color)}).addTo(map);
+            marker.bindPopup(`<div style="color:#000; font-size:12px;"><b>${pin.title}</b><br><span style="font-size:10px;color:#666;">by ${pin.author}</span><br>${pin.desc}<br><button onclick="deletePin('${pin.id}')" style="background:var(--danger); color:#fff; border:none; border-radius:4px; padding:4px 8px; margin-top:5px; cursor:pointer; font-size:10px;">削除</button></div>`);
+            pinsData[pin.id] = { data: pin, marker: marker };
+
+            if(currentMarker) {
+                const myLatLng = currentMarker.getLatLng();
+                const pinLatLng = L.latLng(pin.lat, pin.lng);
+                if(map.distance(myLatLng, pinLatLng) <= 50) {
+                    marker.bindTooltip(pin.title, {permanent: true, direction: 'top', offset: [0, -28], className: 'name-tooltip'}).openTooltip();
+                }
+            }
+        }
+        
+        function removePinLocally(id) { if (pinsData[id]) { map.removeLayer(pinsData[id].marker); delete pinsData[id]; } }
+        
+        window.deletePin = (id) => {
+            removePinLocally(id);
+            if (currentConnection) currentConnection.send({ type: 'delete_pin', id: id });
+            map.closePopup();
+        };
+
+        const createPinEvent = (e) => {
+            const title = prompt('ピンの名前を入力してください:'); if (!title) return; 
+            const desc = prompt('ピンの説明を入力してください:');
+            const newPin = { id: 'p'+Date.now(), lat: e.latlng.lat, lng: e.latlng.lng, title: title, desc: desc || '', author: getMyName(), color: getMyColor() };
+            renderPin(newPin);
+            if (currentConnection) currentConnection.send({ type: 'sync_pin', pin: newPin });
+        };
+        map.on('dblclick', createPinEvent); 
+        map.on('contextmenu', createPinEvent);
+
+        // --- 通信機能 (PeerJS) ---
+        let peer = null; let currentConnection = null;
+        const statusText = document.getElementById('status-text');
+
+        function initPeer(callback) {
+            if (!peer) {
+                peer = new Peer(Math.floor(100000 + Math.random() * 900000).toString()); 
+                peer.on('open', (id) => callback(id));
+                peer.on('connection', (conn) => setupConnection(conn));
+            } else callback(peer.id);
+        }
+
+        function setupConnection(conn) {
+            currentConnection = conn;
+            statusText.innerText = '接続済み'; statusText.style.color = '#059669';
+
+            conn.on('open', () => {
+                conn.send({ type: 'info', name: getMyName(), color: getMyColor() });
+                Object.values(pinsData).forEach(p => conn.send({ type: 'sync_pin', pin: p.data }));
+            });
+
+            conn.on('data', (data) => {
+                if (data.type === 'info') {
+                    friendName = data.name;
+                    friendRouteLine.setStyle({ color: data.color });
+                    appendMessage(`${friendName}と接続しました`, false, 'システム', '#6b7280');
+                    if (friendMarker) { friendMarker.setTooltipContent(friendName); friendMarker.setIcon(getPulseIcon(data.color)); }
+                }
+                else if (data.type === 'pos') {
+                    friendRouteLine.addLatLng([data.lat, data.lng]);
+                    if (!friendMarker) {
+                        friendMarker = L.marker([data.lat, data.lng], {icon: getPulseIcon(data.color)}).addTo(map);
+                        friendMarker.bindTooltip(friendName, {permanent: true, direction: 'top', offset: [0, -8], className: 'name-tooltip'}).openTooltip();
+                    } else {
+                        friendMarker.setLatLng([data.lat, data.lng]);
+                        friendMarker.setIcon(getPulseIcon(data.color));
+                    }
+                }
+                else if (data.type === 'chat') appendMessage(data.text, false, data.name, data.color);
+                else if (data.type === 'sync_pin') renderPin(data.pin);
+                else if (data.type === 'delete_pin') removePinLocally(data.id);
+            });
+
+            conn.on('close', () => {
+                statusText.innerText = '切断'; statusText.style.color = 'var(--danger)';
+                if(friendMarker) map.removeLayer(friendMarker); friendMarker = null;
+                appendMessage('切断されました', false, 'システム', 'var(--danger)');
+            });
+        }
+
+        document.getElementById('host-btn').addEventListener('click', () => {
+            initPeer((id) => prompt('あなたのID (相手に教えてください):', id));
+        });
+        document.getElementById('connect-btn').addEventListener('click', () => {
+            const targetId = prompt('相手のIDを入力してください:');
+            if (targetId) initPeer(() => setupConnection(peer.connect(targetId.trim())));
+        });
+
+        // --- チャット処理 ---
+        const chatPanel = document.getElementById('chat-panel');
+        const chatBadge = document.getElementById('chat-badge');
+        const chatMessages = document.getElementById('chat-messages');
+        const chatInput = document.getElementById('chat-input');
+        let unreadCount = 0;
+
+        document.getElementById('floating-chat-btn').addEventListener('click', () => {
+            chatPanel.classList.add('active');
+            unreadCount = 0; chatBadge.style.display = 'none';
+        });
+        document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.remove('active'));
+
+        function appendMessage(text, isSelf, senderName, color) {
+            const msgDiv = document.createElement('div');
+            if (isSelf) {
+                msgDiv.className = 'msg msg-self';
+                msgDiv.innerText = text;
+            } else {
+                msgDiv.className = 'msg msg-friend';
+                msgDiv.innerHTML = `<div class="msg-friend-name" style="color:${color}">${senderName}</div><div>${text}</div>`;
+                if (!chatPanel.classList.contains('active')) {
+                    unreadCount++;
+                    chatBadge.style.display = 'flex'; chatBadge.innerText = unreadCount;
+                }
+            }
+            chatMessages.appendChild(msgDiv);
+            chatMessages.scrollTop = chatMessages.scrollHeight;
+        }
+
+        function sendChat() {
+            const text = chatInput.value.trim();
+            if(!text) return;
+            if(currentConnection) currentConnection.send({ type: 'chat', text: text, name: getMyName(), color: getMyColor() });
+            appendMessage(text, true);
+            chatInput.value = '';
+        }
+
+        document.getElementById('chat-send').addEventListener('click', sendChat);
+        chatInput.addEventListener('keypress', (e) => {
+            if (e.key === 'Enter') sendChat();
+        });
+
+        function saveSettings() {
+            localStorage.setItem('mapSettings', JSON.stringify({ userName: userNameInput.value, userColor: userColorInput.value }));
+            myRouteLine.setStyle({ color: getMyColor() });
+            if (currentMarker) { currentMarker.setTooltipContent(getMyName()); currentMarker.setIcon(getPulseIcon(getMyColor())); }
+            if (currentConnection) currentConnection.send({ type: 'info', name: getMyName(), color: getMyColor() });
+        }
+
+        document.getElementById('btn-reset').addEventListener('click', () => {
+            if (confirm('記録された経路をすべて削除しますか？')) {
+                routeHistory = [];
+                myRouteLine.setLatLngs([]);
+                updateDisplay();
+            }
+        });
+
+        // --- 位置情報取得・ピン接近判定 ---
+        function onPositionUpdate(pos) {
+            const lat = pos.coords.latitude, lng = pos.coords.longitude;
+            
+            if (pos.coords.speed !== null && pos.coords.speed >= 0) {
+                currentSpeedMS = pos.coords.speed;
+            }
+            
+            routeHistory.push({ lat: lat, lng: lng, timestamp: Date.now() });
+            updateDisplay(); 
+            
+            if (!currentMarker) {
+                currentMarker = L.marker([lat, lng], {icon: getPulseIcon(getMyColor())}).addTo(map);
+                currentMarker.bindTooltip(getMyName(), {permanent: true, direction: 'top', offset: [0, -8], className: 'name-tooltip'}).openTooltip();
+                map.flyTo([lat, lng], 16); 
+            } else {
+                currentMarker.setLatLng([lat, lng]);
+            }
+
+            const myLatLng = L.latLng(lat, lng);
+            Object.values(pinsData).forEach(p => {
+                const pinLatLng = L.latLng(p.data.lat, p.data.lng);
+                const dist = map.distance(myLatLng, pinLatLng);
+                if (dist <= 50) {
+                    if (!p.marker.getTooltip()) {
+                        p.marker.bindTooltip(p.data.title, {permanent: true, direction: 'top', offset: [0, -28], className: 'name-tooltip'}).openTooltip();
+                    }
+                } else {
+                    if (p.marker.getTooltip()) {
+                        p.marker.unbindTooltip();
+                    }
+                }
+            });
+            
+            if (currentConnection) currentConnection.send({ type: 'pos', lat: lat, lng: lng, color: getMyColor() });
+        }
+
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(onPositionUpdate);
+            navigator.geolocation.watchPosition(onPositionUpdate, (e) => {}, { enableHighAccuracy: true });
+            setInterval(updateDisplay, 10000);
+        }
+    </script>
+</body>
+</html>
