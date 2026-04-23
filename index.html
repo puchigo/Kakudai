@@ -381,7 +381,6 @@
         let peer = null; let roomPassword = ''; 
         const connections = {}; const friends = {};     
 
-        // 【追加】ルーム情報を画面に表示する関数
         function updateConnectionInfoDisplay(role, id, pwd) {
             const infoDiv = document.getElementById('connection-info');
             if (role && id) {
@@ -393,7 +392,6 @@
             }
         }
 
-        // 【追加】コピーボタンの処理
         document.getElementById('copy-info-btn').addEventListener('click', () => {
             const idText = document.getElementById('info-room-id').innerText;
             const pwdText = document.getElementById('info-room-pwd').innerText;
@@ -436,14 +434,25 @@
             localStorage.removeItem('peerSession');
             Object.values(connections).forEach(c => c.close());
             if(peer) peer.destroy(); peer = null; updateStatus(); alert('切断しました。');
-            updateConnectionInfoDisplay(null, null, null); // 画面から情報を消す
+            updateConnectionInfoDisplay(null, null, null);
         }
 
         function initPeer(requestedId, callback) {
             if (!peer || peer.destroyed) {
-                peer = new Peer(requestedId || Math.floor(100000 + Math.random() * 900000).toString());
+                // NAT越え用のSTUNサーバー設定を追加
+                peer = new Peer(requestedId || Math.floor(100000 + Math.random() * 900000).toString(), {
+                    config: { 'iceServers': [{ urls: 'stun:stun.l.google.com:19302' }, { urls: 'stun:stun1.l.google.com:19302' }] }
+                });
                 peer.on('open', (id) => callback(id));
                 peer.on('connection', (conn) => setupConnection(conn, false));
+                // 接続エラーや相手が見つからない際のアラート処理を追加
+                peer.on('error', (err) => {
+                    if (err.type === 'peer-unavailable') {
+                        alert('通信相手が見つかりません。通信できないか、電源が切れています。');
+                    } else if (err.type === 'network' || err.type === 'server-error') {
+                        alert('サーバーとの通信エラーです。通信環境を確認してください。');
+                    }
+                });
             } else callback(peer.id);
         }
 
@@ -491,6 +500,8 @@
                 const f = friends[conn.peer];
                 if (f) { if (f.marker) map.removeLayer(f.marker); if (f.routeLine) map.removeLayer(f.routeLine); delete friends[conn.peer]; }
                 delete connections[conn.peer]; updateStatus();
+                // 接続が途切れた時のアラートを追加
+                alert('通信相手との接続が切れました。電源が切れたか、通信環境が不安定です。');
             });
         }
 
@@ -505,7 +516,7 @@
             document.getElementById('host-modal').classList.remove('active');
             initPeer(null, (id) => { 
                 saveSession('host', id, roomPassword); 
-                updateConnectionInfoDisplay('host', id, roomPassword); // 情報を表示
+                updateConnectionInfoDisplay('host', id, roomPassword); 
                 alert(`ID: ${id}\nPASS: ${roomPassword||'なし'}`); 
             });
         });
@@ -524,7 +535,7 @@
             document.getElementById('connect-modal').classList.remove('active');
             initPeer(null, () => { 
                 saveSession('guest', targetId, roomPassword); 
-                updateConnectionInfoDisplay('guest', targetId, roomPassword); // 情報を表示
+                updateConnectionInfoDisplay('guest', targetId, roomPassword); 
                 setupConnection(peer.connect(targetId, { metadata: { password: roomPassword } }), true); 
             });
         });
@@ -594,7 +605,7 @@
             const session = JSON.parse(localStorage.getItem('peerSession'));
             if (session) {
                 roomPassword = session.pwd || '';
-                updateConnectionInfoDisplay(session.role, session.hostId, session.pwd); // リロード時も情報を復元
+                updateConnectionInfoDisplay(session.role, session.hostId, session.pwd);
                 if (session.role === 'host') initPeer(session.hostId, () => {});
                 else if (session.role === 'guest') initPeer(null, () => setupConnection(peer.connect(session.hostId, { metadata: { password: roomPassword } }), true));
             }
