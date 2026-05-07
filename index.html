@@ -3,539 +3,384 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>P2P Screen Share & Chat & Video</title>
+    <title>P2P Connect - Pro Edition</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; overflow: hidden; }
         
-        /* 縦横比を考慮したビデオコンテナの調整 */
+        /* 縦横比を考慮したビデオコンテナ */
         .video-container { 
-            position: relative; 
-            width: 100%; 
-            flex: 1; 
-            min-height: 0; 
-            background-color: #000; 
-            border-radius: 0.5rem; 
-            overflow: hidden; 
-            display: flex;
-            align-items: center;
-            justify-content: center;
+            position: relative; width: 100%; flex: 1; min-height: 0; background-color: #000; 
+            border-radius: 0.5rem; overflow: hidden; display: flex; align-items: center; justify-content: center;
         }
-        video { 
-            width: 100%; 
-            height: 100%; 
-            object-fit: contain; /* アスペクト比を維持して全体を表示 */
-        }
+        video { width: 100%; height: 100%; object-fit: contain; }
         #localVideo { 
-            position: absolute; 
-            bottom: 10px; 
-            right: 10px; 
-            width: 20%; 
-            min-width: 100px;
-            max-width: 200px;
-            height: auto; 
-            border: 2px solid #fff; 
-            border-radius: 0.25rem; 
-            background-color: #333; 
-            z-index: 10; 
-            aspect-ratio: 16/9; 
-            object-fit: cover; 
+            position: absolute; bottom: 10px; right: 10px; width: 20%; min-width: 100px; max-width: 200px;
+            height: auto; border: 2px solid #fff; border-radius: 0.25rem; background-color: #333; 
+            z-index: 10; aspect-ratio: 16/9; object-fit: cover; 
         }
         
-        .chat-messages { height: 300px; overflow-y: auto; }
-        .message { padding: 0.5rem; border-radius: 0.25rem; max-width: 80%; word-break: break-all; }
+        /* チャット収納アニメーション (スマホ/PC共通) */
+        #chatPanel {
+            transition: transform 0.3s ease-in-out;
+            z-index: 40;
+        }
+        @media (max-width: 768px) {
+            #chatPanel {
+                position: fixed; top: 0; right: 0; bottom: 0; width: 85%;
+                transform: translateX(100%);
+            }
+            #chatPanel.open { transform: translateX(0); }
+        }
+
+        .chat-messages { height: 100%; overflow-y: auto; }
+        .message { padding: 0.5rem; border-radius: 0.25rem; max-width: 85%; word-break: break-all; }
         .message.self { background-color: #dbeafe; border-bottom-right-radius: 0; }
         .message.peer { background-color: #e5e7eb; border-bottom-left-radius: 0; }
 
-        /* CSSで描写した歯車アイコン */
-        .css-gear-wrapper {
-            position: relative; width: 24px; height: 24px;
-            display: flex; align-items: center; justify-content: center;
-            transition: transform 0.3s ease;
-        }
-        .css-gear-wrapper:hover {
-            transform: rotate(45deg);
-        }
-        .css-gear {
-            width: 14px; height: 14px;
-            border: 3px solid #fff;
-            border-radius: 50%;
-            position: relative;
-            box-sizing: border-box;
-            z-index: 2;
-        }
-        .css-gear::before, .css-gear::after,
-        .css-gear-teeth::before, .css-gear-teeth::after {
-            content: ""; position: absolute;
-            width: 4px; height: 18px;
-            background: #fff;
-            top: 50%; left: 50%;
-            border-radius: 1px;
-        }
+        /* CSS歯車 */
+        .css-gear-wrapper { position: relative; width: 24px; height: 24px; display: flex; align-items: center; justify-content: center; transition: transform 0.3s ease; }
+        .css-gear-wrapper:hover { transform: rotate(45deg); }
+        .css-gear { width: 14px; height: 14px; border: 3px solid #fff; border-radius: 50%; position: relative; box-sizing: border-box; z-index: 2; }
+        .css-gear::before, .css-gear::after, .css-gear-teeth::before, .css-gear-teeth::after { content: ""; position: absolute; width: 4px; height: 18px; background: #fff; top: 50%; left: 50%; border-radius: 1px; }
         .css-gear::before { transform: translate(-50%, -50%) rotate(0deg); }
         .css-gear::after { transform: translate(-50%, -50%) rotate(90deg); }
         .css-gear-teeth::before { transform: translate(-50%, -50%) rotate(45deg); }
         .css-gear-teeth::after { transform: translate(-50%, -50%) rotate(135deg); }
-        .css-gear-teeth {
-            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
-        }
-        .css-gear-hole {
-            position: absolute; top: 50%; left: 50%;
-            transform: translate(-50%, -50%);
-            width: 6px; height: 6px;
-            background: #2563eb;
-            border-radius: 50%;
-            z-index: 3;
-        }
+        .css-gear-teeth { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        .css-gear-hole { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 6px; height: 6px; background: #2563eb; border-radius: 50%; z-index: 3; }
     </style>
 </head>
 <body class="h-screen flex flex-col">
 
-    <header class="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center z-10 relative">
-        <h1 class="text-xl font-bold"><i class="fa-solid fa-desktop mr-2"></i>P2P Connect</h1>
+    <header class="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center z-50">
+        <div class="flex items-center gap-3">
+            <h1 class="text-lg font-bold"><i class="fa-solid fa-tower-broadcast mr-1"></i>P2P</h1>
+            <span class="text-xs bg-blue-700 px-2 py-1 rounded hidden sm:inline">ID: <span id="myIdDisplay" class="select-all cursor-pointer">取得中...</span></span>
+        </div>
         <div class="flex items-center gap-4">
-            <span class="text-sm">現在のID: <span id="myIdDisplay" class="font-mono bg-blue-700 px-2 py-1 rounded select-all cursor-pointer" title="クリックでコピー">取得中...</span></span>
-            <button id="openSettingsBtn" class="focus:outline-none" title="設定を開く">
-                <div class="css-gear-wrapper">
-                    <div class="css-gear"></div>
-                    <div class="css-gear-teeth"></div>
-                    <div class="css-gear-hole"></div>
-                </div>
+            <button id="toggleChatBtn" class="bg-blue-500 hover:bg-blue-400 p-2 rounded relative" title="チャットを表示">
+                <i class="fa-solid fa-comments"></i>
+                <span id="chatBadge" class="absolute -top-1 -right-1 bg-red-500 text-[10px] w-4 h-4 rounded-full flex items-center justify-center hidden">!</span>
+            </button>
+            <button id="openSettingsBtn" class="focus:outline-none">
+                <div class="css-gear-wrapper"><div class="css-gear"></div><div class="css-gear-teeth"></div><div class="css-gear-hole"></div></div>
             </button>
         </div>
     </header>
 
-    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" style="display: none;">
-        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md mx-4">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-gear mr-2"></i>設定</h2>
-                <button id="closeSettingsBtn" class="text-gray-500 hover:text-gray-800 text-xl"><i class="fa-solid fa-times"></i></button>
+    <div id="requestModal" class="fixed inset-0 bg-black bg-opacity-70 z-[100] flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white rounded-lg shadow-2xl p-6 w-full max-w-sm text-center">
+            <div class="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
+                <i class="fa-solid fa-bell text-3xl text-blue-500 animate-bounce"></i>
             </div>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-sm text-gray-700 mb-1">希望のID (英数字)</label>
-                    <input type="text" id="myCustomIdInput" placeholder="空なら自動生成" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-700 mb-1">表示名</label>
-                    <input type="text" id="myNameInput" placeholder="名無し" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div>
-                    <label class="block text-sm text-gray-700 mb-1">アイコン画像URL</label>
-                    <input type="text" id="myIconInput" placeholder="https://..." class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
-                </div>
-                <div class="pt-2 text-right">
-                    <button id="saveSettingsBtn" class="w-full bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded transition-colors"><i class="fa-solid fa-floppy-disk mr-2"></i>設定を保存(再読込)</button>
-                </div>
+            <h3 id="requestMsg" class="text-lg font-bold mb-2">リクエストが来ています</h3>
+            <p class="text-sm text-gray-500 mb-6">相手からの接続を許可しますか？</p>
+            <div class="flex gap-3">
+                <button id="rejectBtn" class="flex-1 py-3 border border-gray-300 rounded-lg font-bold text-gray-600 hover:bg-gray-50">拒否</button>
+                <button id="acceptBtn" class="flex-1 py-3 bg-blue-600 text-white rounded-lg font-bold hover:bg-blue-700">許可する</button>
             </div>
         </div>
     </div>
 
-    <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 overflow-hidden">
-        
-        <div class="flex-1 flex flex-col gap-4 min-h-0">
-            <div class="bg-white p-4 rounded-lg shadow-sm flex flex-wrap items-center justify-between gap-2 shrink-0">
-                <div class="flex items-center gap-2 w-full max-w-md">
-                    <input type="text" id="targetIdInput" placeholder="接続先のIDを入力" class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                    <button id="connectBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition-colors"><i class="fa-solid fa-link mr-1"></i>接続</button>
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-[60] flex items-center justify-center p-4" style="display: none;">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold"><i class="fa-solid fa-gear mr-2"></i>設定</h2>
+                <button id="closeSettingsBtn" class="text-gray-400 hover:text-gray-600"><i class="fa-solid fa-times"></i></button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-xs font-bold text-gray-500 uppercase">基本設定</label>
+                    <input type="text" id="myCustomIdInput" placeholder="希望のID" class="w-full border rounded px-3 py-2 mt-1 text-sm">
+                    <input type="text" id="myNameInput" placeholder="表示名" class="w-full border rounded px-3 py-2 mt-2 text-sm">
+                </div>
+                
+                <div class="border-t pt-4">
+                    <label class="block text-xs font-bold text-gray-500 uppercase mb-2">オーディオ設定 (20Hz-20,000Hz)</label>
+                    <select id="audioDeviceSelect" class="w-full border rounded px-3 py-2 text-sm mb-2"></select>
+                    
+                    <div class="p-3 bg-gray-50 rounded-lg space-y-2">
+                        <div class="flex items-center justify-between">
+                            <label class="text-sm">ハイファイモード (加工なし)</label>
+                            <input type="checkbox" id="hifiModeCb" class="w-4 h-4">
+                        </div>
+                        <p class="text-[10px] text-gray-400">※ONにするとブラウザのノイズ除去が無効化され、全音域を通します。エコーに注意してください。</p>
+                        <div id="standardAudioOptions" class="space-y-2">
+                            <div class="flex items-center justify-between opacity-50">
+                                <label class="text-xs">ノイズキャンセリング</label>
+                                <input type="checkbox" id="noiseSuppressionCb" checked disabled>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <button id="saveSettingsBtn" class="w-full bg-blue-600 text-white py-2 rounded-lg font-bold mt-4">設定を保存してリロード</button>
+            </div>
+        </div>
+    </div>
+
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative">
+        <div class="flex-1 flex flex-col p-4 gap-4 min-h-0">
+            <div class="flex flex-wrap gap-2 items-center justify-between bg-white p-3 rounded-lg shadow-sm shrink-0">
+                <div class="flex gap-2 flex-1 min-w-[200px]">
+                    <input type="text" id="targetIdInput" placeholder="相手のID" class="flex-1 border rounded px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500">
+                    <button id="connectBtn" class="bg-green-500 text-white px-4 py-2 rounded text-sm font-bold">接続</button>
                 </div>
                 <div class="flex gap-2">
-                    <button id="videoCallBtn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition-colors shadow-sm disabled:opacity-50"><i class="fa-solid fa-video mr-1"></i>ビデオ通話</button>
-                    <button id="shareScreenBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors shadow-sm disabled:opacity-50"><i class="fa-solid fa-display mr-1"></i>画面共有</button>
+                    <button id="toggleMicBtn" class="w-10 h-10 bg-gray-300 rounded flex items-center justify-center" disabled><i class="fa-solid fa-microphone"></i></button>
+                    <button id="toggleVideoBtn" class="w-10 h-10 bg-gray-300 rounded flex items-center justify-center mr-2" disabled><i class="fa-solid fa-video"></i></button>
+                    <button id="videoCallBtn" class="bg-purple-500 text-white px-4 py-2 rounded text-sm font-bold shrink-0"><i class="fa-solid fa-video mr-1"></i>通話</button>
+                    <button id="shareScreenBtn" class="bg-blue-500 text-white px-4 py-2 rounded text-sm font-bold shrink-0"><i class="fa-solid fa-display mr-1"></i>共有</button>
                 </div>
             </div>
 
             <div class="video-container shadow-md">
                 <video id="remoteVideo" autoplay playsinline></video>
                 <video id="localVideo" autoplay playsinline muted></video>
-                <div id="noVideoMsg" class="absolute inset-0 flex items-center justify-center text-gray-400">
-                    <span><i class="fa-solid fa-video-slash mr-2"></i>映像は受信されていません</span>
+                <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center text-gray-500">
+                    <i class="fa-solid fa-video-slash text-4xl mb-2"></i>
+                    <span class="text-sm">待機中...</span>
                 </div>
             </div>
         </div>
 
-        <div class="w-full md:w-80 bg-white rounded-lg shadow-md flex flex-col shrink-0">
-            <div class="p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
-                <h2 class="font-bold text-gray-700"><i class="fa-solid fa-comments mr-2"></i>チャット</h2>
-                <div class="text-xs text-gray-500 mt-1">状態: <span id="connectionStatus" class="font-semibold text-gray-400">未接続</span></div>
+        <div id="chatPanel" class="w-full md:w-80 bg-white border-l flex flex-col shadow-2xl md:shadow-none">
+            <div class="p-3 border-b bg-gray-50 flex justify-between items-center shrink-0">
+                <span class="font-bold text-sm"><i class="fa-solid fa-comments mr-2"></i>チャットルーム</span>
+                <button id="closeChatBtn" class="md:hidden text-gray-400"><i class="fa-solid fa-chevron-right"></i></button>
             </div>
             
-            <div id="chatBox" class="chat-messages p-3 flex-1 flex flex-col">
-                </div>
+            <div id="chatBox" class="chat-messages p-4 flex-1"></div>
 
-            <div class="p-3 border-t border-gray-200">
+            <div class="p-3 border-t bg-white">
                 <form id="chatForm" class="flex gap-2">
-                    <input type="text" id="chatInput" placeholder="メッセージを入力..." class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
-                    <button type="submit" id="sendBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors disabled:opacity-50" disabled><i class="fa-solid fa-paper-plane"></i></button>
+                    <input type="text" id="chatInput" placeholder="入力..." class="flex-1 border rounded px-3 py-2 text-sm focus:outline-none" disabled>
+                    <button type="submit" id="sendBtn" class="bg-blue-600 text-white w-10 h-10 rounded flex items-center justify-center disabled:opacity-50" disabled><i class="fa-solid fa-paper-plane"></i></button>
                 </form>
-                <button id="clearChatBtn" class="w-full mt-2 text-xs text-red-500 hover:text-red-700 text-right">履歴をクリア</button>
+                <button id="clearChatBtn" class="w-full mt-2 text-[10px] text-gray-400 text-right uppercase tracking-wider">Clear History</button>
             </div>
         </div>
-
     </main>
 
     <script>
-        // 設定と状態の保持
-        const STORAGE_KEY_MY_ID = 'p2p_my_id';
-        const STORAGE_KEY_CUSTOM_ID = 'p2p_custom_id';
-        const STORAGE_KEY_NAME = 'p2p_my_name';
-        const STORAGE_KEY_ICON = 'p2p_my_icon';
-        const STORAGE_KEY_TARGET_ID = 'p2p_target_id';
-        const STORAGE_KEY_CHAT = 'p2p_chat_history';
+        const STORAGE_KEY_PREFIX = 'p2p_v3_';
+        let peer, connection, currentCall, localStream;
+        let isVideoCalling = false, isMicMuted = false, isVideoMuted = false;
+        let pendingRequest = null;
 
-        let peer = null;
-        let connection = null;
-        let currentCall = null;
-        let localStream = null;
-        let isVideoCalling = false; 
+        // --- 初期設定読み込み ---
+        const config = {
+            id: localStorage.getItem(STORAGE_KEY_PREFIX + 'custom_id') || '',
+            name: localStorage.getItem(STORAGE_KEY_PREFIX + 'name') || '名無しさん',
+            hifi: localStorage.getItem(STORAGE_KEY_PREFIX + 'hifi') === 'true',
+            audioDev: localStorage.getItem(STORAGE_KEY_PREFIX + 'audio_dev') || ''
+        };
 
-        // DOM要素
-        const myIdDisplay = document.getElementById('myIdDisplay');
-        const myCustomIdInput = document.getElementById('myCustomIdInput');
-        const myNameInput = document.getElementById('myNameInput');
-        const myIconInput = document.getElementById('myIconInput');
-        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-        const targetIdInput = document.getElementById('targetIdInput');
-        const connectBtn = document.getElementById('connectBtn');
-        const shareScreenBtn = document.getElementById('shareScreenBtn');
-        const videoCallBtn = document.getElementById('videoCallBtn'); 
-        const connectionStatus = document.getElementById('connectionStatus');
-        const chatBox = document.getElementById('chatBox');
-        const chatForm = document.getElementById('chatForm');
-        const chatInput = document.getElementById('chatInput');
-        const sendBtn = document.getElementById('sendBtn');
-        const clearChatBtn = document.getElementById('clearChatBtn');
-        const localVideo = document.getElementById('localVideo');
-        const remoteVideo = document.getElementById('remoteVideo');
-        const noVideoMsg = document.getElementById('noVideoMsg');
-        
-        // 追加: モーダル要素
-        const openSettingsBtn = document.getElementById('openSettingsBtn');
-        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
-        const settingsModal = document.getElementById('settingsModal');
+        const dom = {
+            myId: document.getElementById('myIdDisplay'),
+            targetId: document.getElementById('targetIdInput'),
+            chatPanel: document.getElementById('chatPanel'),
+            chatBox: document.getElementById('chatBox'),
+            requestModal: document.getElementById('requestModal'),
+            requestMsg: document.getElementById('requestMsg')
+        };
 
-        // モーダルの開閉処理
-        openSettingsBtn.addEventListener('click', () => {
-            settingsModal.style.display = 'flex';
-        });
-        closeSettingsBtn.addEventListener('click', () => {
-            settingsModal.style.display = 'none';
-        });
+        // --- チャット開閉ロジック ---
+        function toggleChat(force) {
+            const isOpen = force !== undefined ? force : !dom.chatPanel.classList.contains('open');
+            dom.chatPanel.classList.toggle('open', isOpen);
+            document.getElementById('chatBadge').classList.add('hidden');
+        }
+        document.getElementById('toggleChatBtn').onclick = () => toggleChat();
+        document.getElementById('closeChatBtn').onclick = () => toggleChat(false);
 
-        // ユーザー設定の取得
-        function getUserSettings() {
-            return {
-                name: localStorage.getItem(STORAGE_KEY_NAME) || '名無し',
-                icon: localStorage.getItem(STORAGE_KEY_ICON) || ''
+        // --- PeerJS セットアップ ---
+        function initPeer() {
+            peer = config.id ? new Peer(config.id) : new Peer();
+            
+            peer.on('open', id => dom.myId.textContent = id);
+
+            // 接続要求（チャット用）
+            peer.on('connection', conn => {
+                showRequest('データ接続', conn.metadata?.name || '不明なユーザー', () => {
+                    setupConnection(conn);
+                }, () => conn.close());
+            });
+
+            // 通話要求（映像用）
+            peer.on('call', call => {
+                showRequest('ビデオ通話', call.metadata?.name || '不明なユーザー', async () => {
+                    if (!localStream) await prepareStream(false);
+                    call.answer(localStream);
+                    handleCall(call);
+                }, () => call.close());
+            });
+        }
+
+        // --- リクエスト許可モーダル制御 ---
+        function showRequest(type, name, onAccept, onReject) {
+            dom.requestMsg.innerHTML = `<span class="text-blue-600">${name}</span> から<br>${type}のリクエスト`;
+            dom.requestModal.style.display = 'flex';
+            
+            document.getElementById('acceptBtn').onclick = () => {
+                dom.requestModal.style.display = 'none';
+                onAccept();
+            };
+            document.getElementById('rejectBtn').onclick = () => {
+                dom.requestModal.style.display = 'none';
+                onReject();
             };
         }
 
-        // 初期化
-        function init() {
-            loadSavedData();
-            
-            // PeerJSの初期化 (カスタムIDがあればそれを使用)
-            const customId = localStorage.getItem(STORAGE_KEY_CUSTOM_ID);
-            if (customId) {
-                peer = new Peer(customId, { debug: 2 });
-            } else {
-                peer = new Peer({ debug: 2 });
-            }
+        // --- オーディオ設定 (20Hz-20,000Hz対応) ---
+        async function prepareStream(isScreen) {
+            const audioConstraints = {
+                deviceId: config.audioDev ? { exact: config.audioDev } : undefined,
+                echoCancellation: !config.hifi,
+                noiseSuppression: !config.hifi,
+                autoGainControl: !config.hifi
+            };
 
-            peer.on('open', (id) => {
-                myIdDisplay.textContent = id;
-                localStorage.setItem(STORAGE_KEY_MY_ID, id);
-            });
-
-            // 相手からの接続要求の処理（データ通信/チャット）
-            peer.on('connection', (conn) => {
-                setupConnection(conn);
-            });
-
-            // 相手からの通話（画面共有/ビデオ）要求の処理
-            peer.on('call', (call) => {
-                // 応答する。自分が発信中ならそのストリームを返す
-                call.answer(localStream);
-                handleCallEvents(call);
-            });
-
-            peer.on('error', (err) => {
-                console.error(err);
-                if (err.type === 'unavailable-id') {
-                    alert('指定されたIDは既に使用されています。別のIDに変更してください。');
+            try {
+                if (isScreen) {
+                    localStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: audioConstraints });
                 } else {
-                    alert('エラーが発生しました: ' + err.type);
+                    localStream = await navigator.mediaDevices.getUserMedia({ video: true, audio: audioConstraints });
                 }
-            });
-
-            // 設定保存イベント
-            saveSettingsBtn.addEventListener('click', () => {
-                localStorage.setItem(STORAGE_KEY_CUSTOM_ID, myCustomIdInput.value.trim());
-                localStorage.setItem(STORAGE_KEY_NAME, myNameInput.value.trim());
-                localStorage.setItem(STORAGE_KEY_ICON, myIconInput.value.trim());
-                location.reload(); // 再読み込みして反映
-            });
-
-            // イベントリスナーの登録
-            myIdDisplay.addEventListener('click', () => {
-                navigator.clipboard.writeText(myIdDisplay.textContent);
-                alert('IDをクリップボードにコピーしました');
-            });
-
-            connectBtn.addEventListener('click', () => {
-                const targetId = targetIdInput.value.trim();
-                if (!targetId) return;
-                localStorage.setItem(STORAGE_KEY_TARGET_ID, targetId);
-                const conn = peer.connect(targetId);
-                setupConnection(conn);
-            });
-
-            shareScreenBtn.addEventListener('click', toggleScreenShare);
-            videoCallBtn.addEventListener('click', toggleVideoCall); 
-
-            chatForm.addEventListener('submit', (e) => {
-                e.preventDefault();
-                const text = chatInput.value.trim();
-                if (!text || !connection || !connection.open) return;
-                
-                const settings = getUserSettings();
-                
-                // メッセージ送信 (名前とアイコンも送る)
-                connection.send({ type: 'chat', text: text, name: settings.name, icon: settings.icon });
-                addChatMessage(text, true, settings.name, settings.icon);
-                saveChatHistory(text, true, settings.name, settings.icon);
-                chatInput.value = '';
-            });
-
-            clearChatBtn.addEventListener('click', () => {
-                if(confirm('チャット履歴を消去しますか？')) {
-                    localStorage.removeItem(STORAGE_KEY_CHAT);
-                    chatBox.innerHTML = '';
-                }
-            });
+                document.getElementById('localVideo').srcObject = localStream;
+                updateControlButtons();
+            } catch (e) {
+                console.error(e);
+                alert("メディアの取得に失敗しましたンゴ");
+            }
         }
 
-        // 接続のセットアップ
+        // --- 通信処理 ---
         function setupConnection(conn) {
             connection = conn;
             connection.on('open', () => {
-                updateStatus('接続済み', 'text-green-500');
-                chatInput.disabled = false;
-                sendBtn.disabled = false;
-                
-                // 接続できたら、もし自分が共有/通話中なら自動的に送信する
-                if (localStream) {
-                    const call = peer.call(connection.peer, localStream);
-                    handleCallEvents(call);
-                }
+                document.getElementById('chatInput').disabled = false;
+                document.getElementById('sendBtn').disabled = false;
+                addChatSystemMsg("接続が完了しました");
             });
-
-            connection.on('data', (data) => {
-                if (data && data.type === 'chat') {
-                    addChatMessage(data.text, false, data.name, data.icon);
-                    saveChatHistory(data.text, false, data.name, data.icon);
+            connection.on('data', data => {
+                if (data.type === 'chat') {
+                    addChatMessage(data.text, false, data.name);
+                    if (!dom.chatPanel.classList.contains('open')) {
+                        document.getElementById('chatBadge').classList.remove('hidden');
+                    }
                 }
-            });
-
-            connection.on('close', () => {
-                updateStatus('切断されました', 'text-red-500');
-                chatInput.disabled = true;
-                sendBtn.disabled = true;
             });
         }
 
-        // 通話（メディアストリーム）のイベントハンドリング
-        function handleCallEvents(call) {
+        function handleCall(call) {
             currentCall = call;
-            call.on('stream', (remoteStream) => {
-                remoteVideo.srcObject = remoteStream;
-                noVideoMsg.style.display = 'none';
-            });
-            call.on('close', () => {
-                remoteVideo.srcObject = null;
-                noVideoMsg.style.display = 'flex';
+            call.on('stream', stream => {
+                document.getElementById('remoteVideo').srcObject = stream;
+                document.getElementById('noVideoMsg').style.display = 'none';
             });
         }
 
-        // ストリームの停止処理共通化
-        function stopLocalStream() {
-            if (localStream) {
-                localStream.getTracks().forEach(track => track.stop());
-                localStream = null;
-                localVideo.srcObject = null;
-                if (currentCall) {
-                    currentCall.close();
-                }
-            }
+        // --- UIヘルパー ---
+        function addChatMessage(text, isSelf, name) {
+            const div = document.createElement('div');
+            div.className = `flex flex-col mb-4 ${isSelf ? 'items-end' : 'items-start'}`;
+            div.innerHTML = `
+                <span class="text-[10px] text-gray-400 mb-1">${name}</span>
+                <div class="message ${isSelf ? 'self' : 'peer'} shadow-sm">${text}</div>
+            `;
+            dom.chatBox.appendChild(div);
+            dom.chatBox.scrollTop = dom.chatBox.scrollHeight;
         }
 
-        // 画面共有の開始/停止
-        async function toggleScreenShare() {
-            if (localStream && !isVideoCalling) {
-                // 停止処理
-                stopLocalStream();
-                shareScreenBtn.innerHTML = '<i class="fa-solid fa-display mr-1"></i>画面共有';
-                shareScreenBtn.classList.replace('bg-red-500', 'bg-blue-500');
-                shareScreenBtn.classList.replace('hover:bg-red-600', 'hover:bg-blue-600');
-                videoCallBtn.disabled = false;
-                return;
-            }
-
-            try {
-                if (localStream) stopLocalStream(); // ビデオ通話中なら切る
-                
-                // 開始処理
-                localStream = await navigator.mediaDevices.getDisplayMedia({
-                    video: { cursor: "always" },
-                    audio: true
-                });
-                
-                isVideoCalling = false;
-                localVideo.srcObject = localStream;
-                
-                shareScreenBtn.innerHTML = '<i class="fa-solid fa-stop mr-1"></i>共有停止';
-                shareScreenBtn.classList.replace('bg-blue-500', 'bg-red-500');
-                shareScreenBtn.classList.replace('hover:bg-blue-600', 'hover:bg-red-600');
-                
-                // ビデオ通話ボタンのリセットと無効化
-                videoCallBtn.innerHTML = '<i class="fa-solid fa-video mr-1"></i>ビデオ通話';
-                videoCallBtn.classList.replace('bg-red-500', 'bg-purple-500');
-                videoCallBtn.classList.replace('hover:bg-red-600', 'hover:bg-purple-600');
-                videoCallBtn.disabled = true;
-
-                // 共有がブラウザの機能で停止された場合のハンドリング
-                localStream.getVideoTracks()[0].onended = () => {
-                    toggleScreenShare();
-                };
-
-                // 既に接続されている相手がいれば発信
-                if (connection && connection.open) {
-                    const call = peer.call(connection.peer, localStream);
-                    handleCallEvents(call);
-                }
-
-            } catch (err) {
-                console.error("画面共有の取得に失敗しました", err);
-            }
+        function addChatSystemMsg(text) {
+            const div = document.createElement('div');
+            div.className = "text-center text-[10px] text-gray-400 my-2 italic";
+            div.textContent = `--- ${text} ---`;
+            dom.chatBox.appendChild(div);
         }
 
-        // ビデオ通話の開始/停止
-        async function toggleVideoCall() {
-            if (localStream && isVideoCalling) {
-                // 停止処理
-                stopLocalStream();
-                videoCallBtn.innerHTML = '<i class="fa-solid fa-video mr-1"></i>ビデオ通話';
-                videoCallBtn.classList.replace('bg-red-500', 'bg-purple-500');
-                videoCallBtn.classList.replace('hover:bg-red-600', 'hover:bg-purple-600');
-                shareScreenBtn.disabled = false;
-                return;
-            }
-
-            try {
-                if (localStream) stopLocalStream(); // 画面共有中なら切る
-
-                // 開始処理
-                localStream = await navigator.mediaDevices.getUserMedia({
-                    video: true,
-                    audio: true
-                });
-                
-                isVideoCalling = true;
-                localVideo.srcObject = localStream;
-                
-                videoCallBtn.innerHTML = '<i class="fa-solid fa-stop mr-1"></i>通話停止';
-                videoCallBtn.classList.replace('bg-purple-500', 'bg-red-500');
-                videoCallBtn.classList.replace('hover:bg-purple-600', 'hover:bg-red-600');
-
-                // 画面共有ボタンのリセットと無効化
-                shareScreenBtn.innerHTML = '<i class="fa-solid fa-display mr-1"></i>画面共有';
-                shareScreenBtn.classList.replace('bg-red-500', 'bg-blue-500');
-                shareScreenBtn.classList.replace('hover:bg-red-600', 'hover:bg-blue-600');
-                shareScreenBtn.disabled = true;
-
-                // 既に接続されている相手がいれば発信
-                if (connection && connection.open) {
-                    const call = peer.call(connection.peer, localStream);
-                    handleCallEvents(call);
-                }
-
-            } catch (err) {
-                console.error("カメラ・マイクの取得に失敗しました", err);
-                alert("カメラまたはマイクのアクセスが許可されていません。");
-            }
+        function updateControlButtons() {
+            const micBtn = document.getElementById('toggleMicBtn');
+            const vidBtn = document.getElementById('toggleVideoBtn');
+            micBtn.disabled = vidBtn.disabled = !localStream;
+            micBtn.className = `w-10 h-10 rounded flex items-center justify-center ${isMicMuted ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'}`;
+            vidBtn.className = `w-10 h-10 rounded flex items-center justify-center ${isVideoMuted ? 'bg-red-500 text-white' : 'bg-gray-200 text-gray-700'}`;
         }
 
-        // UI・ストレージ関連ヘルパー
-        function updateStatus(text, colorClass) {
-            connectionStatus.textContent = text;
-            connectionStatus.className = `font-semibold ${colorClass}`;
-        }
+        // --- イベントリスナー ---
+        document.getElementById('connectBtn').onclick = () => {
+            const tid = dom.targetId.value.trim();
+            if (!tid) return;
+            const conn = peer.connect(tid, { metadata: { name: config.name } });
+            setupConnection(conn);
+        };
 
-        function addChatMessage(text, isSelf, name = '名無し', iconUrl = '') {
-            const wrapper = document.createElement('div');
-            wrapper.className = `flex gap-2 mb-3 ${isSelf ? 'flex-row-reverse' : 'flex-row'}`;
-            
-            // アイコン
-            const iconImg = document.createElement('img');
-            // アイコンURLがない場合はダミー画像を生成
-            iconImg.src = iconUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
-            iconImg.className = 'w-8 h-8 rounded-full object-cover shrink-0 bg-gray-200 border border-gray-300';
-            
-            // メッセージ本体
-            const msgBox = document.createElement('div');
-            msgBox.className = `message ${isSelf ? 'self' : 'peer'} text-sm flex flex-col shadow-sm`;
-            msgBox.style.margin = '0'; 
-            
-            // 名前
-            const nameSpan = document.createElement('span');
-            nameSpan.className = 'text-xs text-gray-500 mb-1 font-semibold';
-            nameSpan.textContent = name;
-            
-            // テキスト
-            const textSpan = document.createElement('span');
-            textSpan.textContent = text;
-            
-            msgBox.appendChild(nameSpan);
-            msgBox.appendChild(textSpan);
-            
-            wrapper.appendChild(iconImg);
-            wrapper.appendChild(msgBox);
-            
-            chatBox.appendChild(wrapper);
-            chatBox.scrollTop = chatBox.scrollHeight;
-        }
+        document.getElementById('videoCallBtn').onclick = async () => {
+            const tid = dom.targetId.value.trim();
+            if (!tid) return;
+            await prepareStream(false);
+            const call = peer.call(tid, localStream, { metadata: { name: config.name } });
+            handleCall(call);
+        };
 
-        function saveChatHistory(text, isSelf, name, icon) {
-            let history = JSON.parse(localStorage.getItem(STORAGE_KEY_CHAT) || '[]');
-            history.push({ text, isSelf, name, icon });
-            // 最大100件まで保持
-            if (history.length > 100) history.shift();
-            localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(history));
-        }
+        document.getElementById('shareScreenBtn').onclick = async () => {
+            const tid = dom.targetId.value.trim();
+            if (!tid) return;
+            await prepareStream(true);
+            const call = peer.call(tid, localStream, { metadata: { name: config.name } });
+            handleCall(call);
+        };
 
-        function loadSavedData() {
-            // 設定パネルの復元
-            myCustomIdInput.value = localStorage.getItem(STORAGE_KEY_CUSTOM_ID) || '';
-            myNameInput.value = localStorage.getItem(STORAGE_KEY_NAME) || '';
-            myIconInput.value = localStorage.getItem(STORAGE_KEY_ICON) || '';
+        document.getElementById('chatForm').onsubmit = (e) => {
+            e.preventDefault();
+            const text = document.getElementById('chatInput').value.trim();
+            if (!text || !connection) return;
+            connection.send({ type: 'chat', text, name: config.name });
+            addChatMessage(text, true, config.name);
+            document.getElementById('chatInput').value = '';
+        };
 
-            // 前回接続した相手のID
-            const savedTargetId = localStorage.getItem(STORAGE_KEY_TARGET_ID);
-            if (savedTargetId) {
-                targetIdInput.value = savedTargetId;
-            }
+        document.getElementById('toggleMicBtn').onclick = () => {
+            isMicMuted = !isMicMuted;
+            localStream.getAudioTracks().forEach(t => t.enabled = !isMicMuted);
+            updateControlButtons();
+        };
 
-            // チャット履歴
-            const history = JSON.parse(localStorage.getItem(STORAGE_KEY_CHAT) || '[]');
-            history.forEach(msg => {
-                addChatMessage(msg.text, msg.isSelf, msg.name, msg.icon);
-            });
-        }
+        document.getElementById('toggleVideoBtn').onclick = () => {
+            isVideoMuted = !isVideoMuted;
+            localStream.getVideoTracks().forEach(t => t.enabled = !isVideoMuted);
+            updateControlButtons();
+        };
 
-        // 起動
-        init();
+        // --- 設定管理 ---
+        document.getElementById('openSettingsBtn').onclick = async () => {
+            document.getElementById('myCustomIdInput').value = config.id;
+            document.getElementById('myNameInput').value = config.name;
+            document.getElementById('hifiModeCb').checked = config.hifi;
+            
+            const devices = await navigator.mediaDevices.enumerateDevices();
+            const audioSelect = document.getElementById('audioDeviceSelect');
+            audioSelect.innerHTML = devices.filter(d => d.kind === 'audioinput')
+                .map(d => `<option value="${d.deviceId}" ${d.deviceId === config.audioDev ? 'selected' : ''}>${d.label || 'マイク'}</option>`).join('');
+            
+            document.getElementById('settingsModal').style.display = 'flex';
+        };
+
+        document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').style.display = 'none';
+
+        document.getElementById('saveSettingsBtn').onclick = () => {
+            localStorage.setItem(STORAGE_KEY_PREFIX + 'custom_id', document.getElementById('myCustomIdInput').value);
+            localStorage.setItem(STORAGE_KEY_PREFIX + 'name', document.getElementById('myNameInput').value);
+            localStorage.setItem(STORAGE_KEY_PREFIX + 'hifi', document.getElementById('hifiModeCb').checked);
+            localStorage.setItem(STORAGE_KEY_PREFIX + 'audio_dev', document.getElementById('audioDeviceSelect').value);
+            location.reload();
+        };
+
+        initPeer();
     </script>
 </body>
 </html>
