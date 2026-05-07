@@ -2,627 +2,540 @@
 <html lang="ja">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-    <meta name="referrer" content="no-referrer-when-downgrade" />
-    <title>位置共有システム (ダイレクト接続版)</title>
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>P2P Screen Share & Chat & Video</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
-        :root {
-            --primary: #2563eb; --danger: #dc2626; --bg-main: #f3f4f6;
-            --text-main: #1f2937; --text-sub: #4b5563; --border: #e5e7eb;
-            --card-bg: #ffffff;
-        }
-
-        body, html {
-            margin: 0; padding: 0; height: 100%; width: 100%; overflow: hidden;
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-            background-color: var(--bg-main); color: var(--text-main);
-        }
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; background-color: #f3f4f6; }
         
-        #map { height: 100%; width: 100%; z-index: 1; }
-
-        .floating-btn {
-            position: absolute; bottom: 20px; height: 44px; border-radius: 22px;
-            font-size: 14px; font-weight: bold; color: white; border: none;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2); cursor: pointer; z-index: 1000;
-            display: flex; align-items: center; justify-content: center; transition: all 0.3s ease;
-        }
-        #floating-chat-btn { right: 20px; width: 80px; background: var(--primary); }
-
-        .badge {
-            position: absolute; top: -6px; right: -6px; background: var(--danger); color: white;
-            font-size: 10px; font-weight: bold; width: 20px; height: 20px; border-radius: 50%;
-            display: none; justify-content: center; align-items: center;
-        }
-
-        #sidebar-wrapper {
-            position: absolute; top: 20px; left: 0; z-index: 1050;
-            transform: translateX(-100%); transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-            pointer-events: none;
+        /* 縦横比を考慮したビデオコンテナの調整 */
+        .video-container { 
+            position: relative; 
+            width: 100%; 
+            flex: 1; 
+            min-height: 0; 
+            background-color: #000; 
+            border-radius: 0.5rem; 
+            overflow: hidden; 
             display: flex;
+            align-items: center;
+            justify-content: center;
         }
-        #sidebar-wrapper.active { transform: translateX(0); }
-
-        #sidebar {
-            display: flex; flex-direction: column; gap: 12px;
-            width: 300px; max-height: calc(100vh - 80px); overflow-y: auto;
-            background: rgba(243, 244, 246, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            padding: 16px; border-radius: 0 16px 16px 0; box-shadow: 5px 10px 25px rgba(0, 0, 0, 0.1);
-            box-sizing: border-box; border: 1px solid var(--border); border-left: none;
-            pointer-events: auto;
+        video { 
+            width: 100%; 
+            height: 100%; 
+            object-fit: contain; /* アスペクト比を維持して全体を表示 */
         }
-
-        #sidebar-toggle-btn {
-            position: absolute; top: 20px; right: -43px; width: 44px; height: 60px;
-            background: rgba(243, 244, 246, 0.95); backdrop-filter: blur(8px); -webkit-backdrop-filter: blur(8px);
-            border: 1px solid var(--border); border-left: none; border-radius: 0 12px 12px 0;
-            box-shadow: 4px 4px 10px rgba(0,0,0,0.1);
-            display: flex; align-items: center; justify-content: center; pointer-events: auto;
-            font-weight: bold; font-size: 16px; color: var(--text-main); cursor: pointer;
-        }
-
-        .data-card { background: var(--card-bg); padding: 12px; border-radius: 10px; border: 1px solid var(--border); }
-        .data-label { font-size: 11px; font-weight: 600; color: var(--text-sub); margin-bottom: 2px; }
-        .data-value { font-size: 22px; font-weight: 800; color: var(--text-main); }
-        .data-unit { font-size: 12px; font-weight: 600; margin-left: 2px; }
-
-        .control-group { display: flex; flex-direction: column; gap: 4px; margin-bottom: 8px; }
-        .control-group label { font-size: 11px; font-weight: 600; color: var(--text-sub); }
-        select, input[type="text"], input[type="color"] {
-            width: 100%; padding: 8px 10px; border-radius: 8px; border: 1px solid var(--border);
-            background: #fff; font-size: 12px; box-sizing: border-box; outline: none; appearance: auto;
+        #localVideo { 
+            position: absolute; 
+            bottom: 10px; 
+            right: 10px; 
+            width: 20%; 
+            min-width: 100px;
+            max-width: 200px;
+            height: auto; 
+            border: 2px solid #fff; 
+            border-radius: 0.25rem; 
+            background-color: #333; 
+            z-index: 10; 
+            aspect-ratio: 16/9; 
+            object-fit: cover; 
         }
         
-        button.action-btn {
-            border: none; padding: 10px; font-size: 12px; font-weight: 700; color: white;
-            border-radius: 8px; cursor: pointer; transition: opacity 0.2s; width: 100%;
+        .chat-messages { height: 300px; overflow-y: auto; }
+        .message { padding: 0.5rem; border-radius: 0.25rem; max-width: 80%; word-break: break-all; }
+        .message.self { background-color: #dbeafe; border-bottom-right-radius: 0; }
+        .message.peer { background-color: #e5e7eb; border-bottom-left-radius: 0; }
+
+        /* CSSで描写した歯車アイコン */
+        .css-gear-wrapper {
+            position: relative; width: 24px; height: 24px;
+            display: flex; align-items: center; justify-content: center;
+            transition: transform 0.3s ease;
         }
-        .btn-red { background: var(--danger); }
-        .btn-blue { background: var(--primary); }
-        .btn-gray { background: #6b7280; }
-        .btn-light { background: #e0f2fe; color: var(--primary); border: 1px solid #bae6fd; }
-        .row-buttons { display: flex; gap: 6px; }
-        .row-buttons button { flex: 1; padding: 8px; font-size: 11px; }
-
-        #status-text { font-size: 11px; text-align: center; font-weight: 700; color: var(--text-sub); margin-top: 4px; }
-
-        #member-list { display: flex; flex-direction: column; gap: 6px; max-height: 150px; overflow-y: auto; }
-        .member-item {
-            display: flex; align-items: center; gap: 8px; padding: 8px 10px;
-            background: var(--card-bg); border: 1px solid var(--border); border-radius: 8px; cursor: pointer;
+        .css-gear-wrapper:hover {
+            transform: rotate(45deg);
         }
-        .member-item:active { background: #e5e7eb; }
-        .member-color { width: 12px; height: 12px; border-radius: 50%; }
-        .member-name { font-size: 12px; font-weight: 600; color: var(--text-main); }
-
-        #chat-panel {
-            position: absolute; right: 20px; bottom: 74px; width: 320px; height: 400px;
-            background: var(--card-bg); border-radius: 16px; box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            display: none; flex-direction: column; z-index: 1060; border: 1px solid var(--border); overflow: hidden;
+        .css-gear {
+            width: 14px; height: 14px;
+            border: 3px solid #fff;
+            border-radius: 50%;
+            position: relative;
+            box-sizing: border-box;
+            z-index: 2;
         }
-        #chat-panel.active { display: flex; }
-        .chat-header { padding: 12px; font-size: 13px; font-weight: bold; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; background: #f9fafb; }
-        #chat-messages { flex: 1; padding: 12px; overflow-y: auto; display: flex; flex-direction: column; gap: 8px; }
-        .msg { max-width: 85%; padding: 8px 10px; border-radius: 10px; font-size: 12px; line-height: 1.4; word-break: break-all; }
-        .msg-self { align-self: flex-end; background: var(--primary); color: white; border-bottom-right-radius: 2px; }
-        .msg-friend { align-self: flex-start; background: #f3f4f6; color: var(--text-main); border-bottom-left-radius: 2px; }
-        .msg-friend-name { font-size: 10px; font-weight: bold; margin-bottom: 2px; }
-        .chat-input-area { padding: 8px; border-top: 1px solid var(--border); display: flex; gap: 6px; background: #f9fafb; }
-        #chat-input { flex: 1; }
-        #chat-send { width: 50px; }
-
-        .modal {
-            position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
-            width: 280px; padding: 20px; z-index: 2000; display: none;
-            background: var(--card-bg); border-radius: 16px; box-shadow: 0 20px 40px rgba(0,0,0,0.2);
-            border: 1px solid var(--border);
+        .css-gear::before, .css-gear::after,
+        .css-gear-teeth::before, .css-gear-teeth::after {
+            content: ""; position: absolute;
+            width: 4px; height: 18px;
+            background: #fff;
+            top: 50%; left: 50%;
+            border-radius: 1px;
         }
-        .modal.active { display: block; }
-        .modal-title { font-size: 14px; font-weight: bold; margin-bottom: 12px; text-align: center; }
-
-        .transparent-icon { background: none; border: none; }
-        .pulse-marker-wrapper { position: relative; width: 16px; height: 16px; }
-        .pulse-marker { width: 100%; height: 100%; background-color: var(--marker-color); border: 2px solid white; border-radius: 50%; position: absolute; z-index: 2; box-shadow: 0 0 4px rgba(0,0,0,0.3); }
-        .name-tooltip { background: white; color: black; border: 1px solid var(--border); border-radius: 4px; font-weight: bold; font-size: 10px; padding: 2px 4px; }
-        .name-tooltip::before { display: none; }
-
-        .custom-css-pin-wrapper { position: relative; width: 24px; height: 24px; }
-        .custom-css-pin { width: 100%; height: 100%; border-radius: 50% 50% 50% 0; background-color: var(--pin-color); transform: rotate(-45deg); border: 2px solid white; position: relative; box-shadow: 0 2px 4px rgba(0,0,0,0.3); }
-        .custom-css-pin::after { content: ''; position: absolute; width: 6px; height: 6px; background: white; border-radius: 50%; top: 50%; left: 50%; transform: translate(-50%, -50%); }
-
-        .recent-peer-item {
-            padding: 6px; background: var(--bg-main); border: 1px solid var(--border);
-            border-radius: 6px; font-size: 11px; cursor: pointer; text-align: center;
+        .css-gear::before { transform: translate(-50%, -50%) rotate(0deg); }
+        .css-gear::after { transform: translate(-50%, -50%) rotate(90deg); }
+        .css-gear-teeth::before { transform: translate(-50%, -50%) rotate(45deg); }
+        .css-gear-teeth::after { transform: translate(-50%, -50%) rotate(135deg); }
+        .css-gear-teeth {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1;
         }
-        .recent-peer-item:hover { background: #e5e7eb; }
-
-        @media (max-width: 768px) {
-            #sidebar-wrapper {
-                top: auto; bottom: 0; left: 0; width: 100%;
-                transform: translateY(100%);
-            }
-            #sidebar-wrapper.active { transform: translateY(0); }
-            #sidebar {
-                width: 100%; max-height: 60vh; border-radius: 20px 20px 0 0;
-                border: 1px solid var(--border); border-bottom: none; border-left: none; border-right: none;
-            }
-            #sidebar-toggle-btn {
-                top: -43px; right: auto; left: 50%; transform: translateX(-50%);
-                width: 80px; height: 44px;
-                border-radius: 12px 12px 0 0; border: 1px solid var(--border); border-bottom: none;
-            }
-            #chat-panel { width: calc(100% - 32px); left: 16px; height: 45vh; }
-            .leaflet-control-zoom { display: none; }
-            .modal { top: 10%; transform: translate(-50%, 0); }
+        .css-gear-hole {
+            position: absolute; top: 50%; left: 50%;
+            transform: translate(-50%, -50%);
+            width: 6px; height: 6px;
+            background: #2563eb;
+            border-radius: 50%;
+            z-index: 3;
         }
     </style>
 </head>
-<body>
+<body class="h-screen flex flex-col">
 
-    <button id="floating-chat-btn" class="floating-btn">チャット<div id="chat-badge" class="badge">0</div></button>
-
-    <div id="sidebar-wrapper" class="active">
-        <div id="sidebar-toggle-btn">＞</div>
-        <div id="sidebar">
-            
-            <div id="connection-info" style="background: #e0f2fe; border: 1px solid #bae6fd; padding: 10px; border-radius: 8px; text-align: center;">
-                <div style="font-size: 11px; font-weight: bold; color: var(--primary);">あなたのID</div>
-                <div style="font-size: 20px; font-weight: 800; letter-spacing: 1px; margin: 4px 0;" id="my-peer-id">読込中...</div>
-                <button id="copy-my-id-btn" class="action-btn btn-light" style="padding: 6px; font-size: 11px;">自分のIDをコピー</button>
-            </div>
-
-            <div class="row-buttons" style="margin-top: 8px;">
-                <button id="connect-btn" class="action-btn btn-blue">友達のIDを追加</button>
-                <button id="disconnect-btn" class="action-btn btn-red">全切断</button>
-            </div>
-            
-            <div id="status-text">待機中</div>
-
-            <div class="control-group" style="margin-top: 12px;">
-                <label>接続中のメンバー</label>
-                <div id="member-list"></div>
-            </div>
-
-            <div style="display:flex; gap:10px; margin-top: 8px;">
-                <div class="data-card" style="flex:1;">
-                    <div class="data-label">現在速度</div>
-                    <div class="data-value" id="val-speed">0.0 <span class="data-unit">km/h</span></div>
+    <header class="bg-blue-600 text-white p-4 shadow-md flex justify-between items-center z-10 relative">
+        <h1 class="text-xl font-bold"><i class="fa-solid fa-desktop mr-2"></i>P2P Connect</h1>
+        <div class="flex items-center gap-4">
+            <span class="text-sm">現在のID: <span id="myIdDisplay" class="font-mono bg-blue-700 px-2 py-1 rounded select-all cursor-pointer" title="クリックでコピー">取得中...</span></span>
+            <button id="openSettingsBtn" class="focus:outline-none" title="設定を開く">
+                <div class="css-gear-wrapper">
+                    <div class="css-gear"></div>
+                    <div class="css-gear-teeth"></div>
+                    <div class="css-gear-hole"></div>
                 </div>
-                <div class="data-card" style="flex:1;">
-                    <div class="data-label">移動距離</div>
-                    <div class="data-value" id="val-dist">0.00 <span class="data-unit">km</span></div>
-                </div>
-            </div>
+            </button>
+        </div>
+    </header>
 
-            <div style="text-align:right; margin-bottom:4px; margin-top: 8px;">
-                <a href="#" id="toggle-advanced" style="font-size:10px; color:var(--text-sub);">詳細設定を隠す</a>
+    <div id="settingsModal" class="fixed inset-0 bg-black bg-opacity-50 z-50 flex items-center justify-center" style="display: none;">
+        <div class="bg-white p-6 rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-gray-800"><i class="fa-solid fa-gear mr-2"></i>設定</h2>
+                <button id="closeSettingsBtn" class="text-gray-500 hover:text-gray-800 text-xl"><i class="fa-solid fa-times"></i></button>
             </div>
-            <div style="display:block;" id="advanced-settings">
-                <div class="control-group">
-                    <select id="sel-speed"><option value="kmh">時速 (km/h)</option><option value="mmin">分速 (m/min)</option><option value="ms">秒速 (m/s)</option></select>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm text-gray-700 mb-1">希望のID (英数字)</label>
+                    <input type="text" id="myCustomIdInput" placeholder="空なら自動生成" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-                <div class="control-group">
-                    <select id="sel-dist"><option value="km">距離 (km)</option><option value="m">距離 (m)</option></select>
+                <div>
+                    <label class="block text-sm text-gray-700 mb-1">表示名</label>
+                    <input type="text" id="myNameInput" placeholder="名無し" class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-                <div class="control-group">
-                    <select id="sel-time"><option value="10">軌跡: 過去10分</option><option value="30">軌跡: 過去30分</option><option value="all">軌跡: すべて</option></select>
+                <div>
+                    <label class="block text-sm text-gray-700 mb-1">アイコン画像URL</label>
+                    <input type="text" id="myIconInput" placeholder="https://..." class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500">
                 </div>
-                <button id="btn-reset" class="action-btn btn-red" style="margin-bottom:8px;">経路リセット</button>
-                <button id="open-settings-btn" class="action-btn btn-gray">プロフィール設定</button>
+                <div class="pt-2 text-right">
+                    <button id="saveSettingsBtn" class="w-full bg-gray-800 hover:bg-gray-900 text-white px-4 py-2 rounded transition-colors"><i class="fa-solid fa-floppy-disk mr-2"></i>設定を保存(再読込)</button>
+                </div>
             </div>
         </div>
     </div>
 
-    <div id="chat-panel">
-        <div class="chat-header"><span>チャット</span><span id="close-chat-btn" style="cursor:pointer;">× 閉じる</span></div>
-        <div id="chat-messages"></div>
-        <div class="chat-input-area">
-            <input type="text" id="chat-input" placeholder="メッセージ...">
-            <button id="chat-send" class="action-btn btn-blue">送信</button>
-        </div>
-    </div>
-
-    <div id="settings-modal" class="modal">
-        <div class="modal-title">プロフィール設定</div>
-        <div class="control-group"><label>名前</label><input type="text" id="user-name" maxlength="12"></div>
-        <div class="control-group"><label>テーマカラー</label><input type="color" id="user-color"></div>
-        <button id="close-settings-btn" class="action-btn btn-blue" style="margin-top: 16px;">保存して閉じる</button>
-    </div>
-
-    <div id="pin-modal" class="modal">
-        <div class="modal-title">ピンの設置</div>
-        <div class="control-group"><label>ピンの名前</label><input type="text" id="pin-title-input" placeholder="例: 集合場所" maxlength="20"></div>
-        <div class="control-group"><label>説明 (任意)</label><input type="text" id="pin-desc-input" placeholder="例: 10時集合"></div>
-        <div class="row-buttons" style="margin-top: 16px;">
-            <button id="pin-cancel-btn" class="action-btn btn-gray">キャンセル</button>
-            <button id="pin-save-btn" class="action-btn btn-blue">設置</button>
-        </div>
-    </div>
-
-    <div id="connect-modal" class="modal">
-        <div class="modal-title">友達のIDを入力して接続</div>
-        <div class="control-group"><label>接続先ID</label><input type="text" id="connect-id-input" placeholder="例: 123456"></div>
+    <main class="flex-1 flex flex-col md:flex-row p-4 gap-4 overflow-hidden">
         
-        <div class="control-group" style="margin-top: 12px;">
-            <label>最近接続したID</label>
-            <div id="recent-peers-list" style="max-height: 80px; overflow-y: auto; display: flex; flex-direction: column; gap: 4px;"></div>
+        <div class="flex-1 flex flex-col gap-4 min-h-0">
+            <div class="bg-white p-4 rounded-lg shadow-sm flex flex-wrap items-center justify-between gap-2 shrink-0">
+                <div class="flex items-center gap-2 w-full max-w-md">
+                    <input type="text" id="targetIdInput" placeholder="接続先のIDを入力" class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    <button id="connectBtn" class="bg-green-500 hover:bg-green-600 text-white px-4 py-2 rounded transition-colors"><i class="fa-solid fa-link mr-1"></i>接続</button>
+                </div>
+                <div class="flex gap-2">
+                    <button id="videoCallBtn" class="bg-purple-500 hover:bg-purple-600 text-white px-4 py-2 rounded transition-colors shadow-sm disabled:opacity-50"><i class="fa-solid fa-video mr-1"></i>ビデオ通話</button>
+                    <button id="shareScreenBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors shadow-sm disabled:opacity-50"><i class="fa-solid fa-display mr-1"></i>画面共有</button>
+                </div>
+            </div>
+
+            <div class="video-container shadow-md">
+                <video id="remoteVideo" autoplay playsinline></video>
+                <video id="localVideo" autoplay playsinline muted></video>
+                <div id="noVideoMsg" class="absolute inset-0 flex items-center justify-center text-gray-400">
+                    <span><i class="fa-solid fa-video-slash mr-2"></i>映像は受信されていません</span>
+                </div>
+            </div>
         </div>
 
-        <div class="row-buttons" style="margin-top: 16px;">
-            <button id="connect-cancel-btn" class="action-btn btn-gray">キャンセル</button>
-            <button id="connect-start-btn" class="action-btn btn-blue">接続</button>
-        </div>
-    </div>
-    
-    <div id="map"></div>
+        <div class="w-full md:w-80 bg-white rounded-lg shadow-md flex flex-col shrink-0">
+            <div class="p-3 border-b border-gray-200 bg-gray-50 rounded-t-lg">
+                <h2 class="font-bold text-gray-700"><i class="fa-solid fa-comments mr-2"></i>チャット</h2>
+                <div class="text-xs text-gray-500 mt-1">状態: <span id="connectionStatus" class="font-semibold text-gray-400">未接続</span></div>
+            </div>
+            
+            <div id="chatBox" class="chat-messages p-3 flex-1 flex flex-col">
+                </div>
 
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
+            <div class="p-3 border-t border-gray-200">
+                <form id="chatForm" class="flex gap-2">
+                    <input type="text" id="chatInput" placeholder="メッセージを入力..." class="flex-1 border border-gray-300 rounded px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" disabled>
+                    <button type="submit" id="sendBtn" class="bg-blue-500 hover:bg-blue-600 text-white px-4 py-2 rounded transition-colors disabled:opacity-50" disabled><i class="fa-solid fa-paper-plane"></i></button>
+                </form>
+                <button id="clearChatBtn" class="w-full mt-2 text-xs text-red-500 hover:text-red-700 text-right">履歴をクリア</button>
+            </div>
+        </div>
+
+    </main>
+
     <script>
-        // UI操作の伝播防止
-        ['sidebar-wrapper', 'settings-modal', 'pin-modal', 'connect-modal', 'chat-panel', 'floating-chat-btn'].forEach(id => {
-            L.DomEvent.disableClickPropagation(document.getElementById(id));
-        });
+        // 設定と状態の保持
+        const STORAGE_KEY_MY_ID = 'p2p_my_id';
+        const STORAGE_KEY_CUSTOM_ID = 'p2p_custom_id';
+        const STORAGE_KEY_NAME = 'p2p_my_name';
+        const STORAGE_KEY_ICON = 'p2p_my_icon';
+        const STORAGE_KEY_TARGET_ID = 'p2p_target_id';
+        const STORAGE_KEY_CHAT = 'p2p_chat_history';
 
-        const sidebarWrapper = document.getElementById('sidebar-wrapper');
-        const toggleBtn = document.getElementById('sidebar-toggle-btn');
-        const chatPanel = document.getElementById('chat-panel');
+        let peer = null;
+        let connection = null;
+        let currentCall = null;
+        let localStream = null;
+        let isVideoCalling = false; 
+
+        // DOM要素
+        const myIdDisplay = document.getElementById('myIdDisplay');
+        const myCustomIdInput = document.getElementById('myCustomIdInput');
+        const myNameInput = document.getElementById('myNameInput');
+        const myIconInput = document.getElementById('myIconInput');
+        const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+        const targetIdInput = document.getElementById('targetIdInput');
+        const connectBtn = document.getElementById('connectBtn');
+        const shareScreenBtn = document.getElementById('shareScreenBtn');
+        const videoCallBtn = document.getElementById('videoCallBtn'); 
+        const connectionStatus = document.getElementById('connectionStatus');
+        const chatBox = document.getElementById('chatBox');
+        const chatForm = document.getElementById('chatForm');
+        const chatInput = document.getElementById('chatInput');
+        const sendBtn = document.getElementById('sendBtn');
+        const clearChatBtn = document.getElementById('clearChatBtn');
+        const localVideo = document.getElementById('localVideo');
+        const remoteVideo = document.getElementById('remoteVideo');
+        const noVideoMsg = document.getElementById('noVideoMsg');
         
-        function updateToggleBtn() {
-            const isActive = sidebarWrapper.classList.contains('active');
-            const isMobile = window.innerWidth <= 768;
-            if (isMobile) {
-                toggleBtn.innerText = isActive ? '▼' : '▲';
-            } else {
-                toggleBtn.innerText = isActive ? '＜' : '＞';
-            }
-        }
+        // 追加: モーダル要素
+        const openSettingsBtn = document.getElementById('openSettingsBtn');
+        const closeSettingsBtn = document.getElementById('closeSettingsBtn');
+        const settingsModal = document.getElementById('settingsModal');
 
-        toggleBtn.addEventListener('click', () => {
-            sidebarWrapper.classList.toggle('active');
-            updateToggleBtn();
-            chatPanel.classList.remove('active');
+        // モーダルの開閉処理
+        openSettingsBtn.addEventListener('click', () => {
+            settingsModal.style.display = 'flex';
         });
-        window.addEventListener('resize', updateToggleBtn);
-        updateToggleBtn();
-
-        document.getElementById('toggle-advanced').addEventListener('click', (e) => {
-            e.preventDefault();
-            const adv = document.getElementById('advanced-settings');
-            const isHidden = adv.style.display === 'none';
-            adv.style.display = isHidden ? 'block' : 'none';
-            e.target.innerText = isHidden ? '詳細設定を隠す' : '詳細設定を開く';
+        closeSettingsBtn.addEventListener('click', () => {
+            settingsModal.style.display = 'none';
         });
 
-        const map = L.map('map', { zoomControl: false, doubleClickZoom: false }).setView([35.6812, 139.7671], 16);
-        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', { 
-            maxZoom: 20,
-            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> &copy; <a href="https://carto.com/">CARTO</a>'
-        }).addTo(map);
-
-        const settings = JSON.parse(localStorage.getItem('mapSettings') || '{}');
-        const userNameInput = document.getElementById('user-name');
-        const userColorInput = document.getElementById('user-color');
-        userNameInput.value = settings.userName || 'ユーザー';
-        userColorInput.value = settings.userColor || '#2563eb';
-
-        document.getElementById('open-settings-btn').addEventListener('click', () => document.getElementById('settings-modal').classList.add('active'));
-        document.getElementById('close-settings-btn').addEventListener('click', () => {
-            document.getElementById('settings-modal').classList.remove('active');
-            saveSettings();
-        });
-
-        let currentSpeedMS = 0; let routeHistory = []; 
-        let currentMarker = null; let myRouteLine = L.polyline([], { color: userColorInput.value, weight: 5, opacity: 0.7 }).addTo(map);
-        const pinsData = {};
-
-        function updateDisplay() {
-            let sUnit = document.getElementById('sel-speed').value;
-            let val = sUnit === 'kmh' ? (currentSpeedMS * 3.6).toFixed(1) : (sUnit === 'mmin' ? (currentSpeedMS * 60).toFixed(0) : currentSpeedMS.toFixed(1));
-            document.getElementById('val-speed').innerHTML = `${val} <span class="data-unit">${sUnit}</span>`;
-
-            const now = Date.now();
-            let limit = document.getElementById('sel-time').value === 'all' ? 0 : now - (parseInt(document.getElementById('sel-time').value) * 60000);
-            let displayPath = [], totalM = 0;
-            routeHistory.filter(pt => pt.timestamp >= limit).forEach((pt, i, arr) => {
-                displayPath.push([pt.lat, pt.lng]);
-                if (i > 0) totalM += map.distance([arr[i-1].lat, arr[i-1].lng], [pt.lat, pt.lng]);
-            });
-            myRouteLine.setLatLngs(displayPath);
-            let dVal = document.getElementById('sel-dist').value === 'km' ? (totalM / 1000).toFixed(2) : totalM.toFixed(0);
-            document.getElementById('val-dist').innerHTML = `${dVal} <span class="data-unit">${document.getElementById('sel-dist').value}</span>`;
-        }
-        ['sel-speed', 'sel-dist', 'sel-time'].forEach(id => document.getElementById(id).addEventListener('change', updateDisplay));
-
-        const getPulseIcon = (color) => L.divIcon({ className: 'transparent-icon', html: `<div class="pulse-marker-wrapper" style="--marker-color: ${color};"><div class="pulse-marker"></div></div>`, iconSize: [16, 16], iconAnchor: [8, 8] });
-        const getPinIcon = (color) => L.divIcon({ className: 'transparent-icon', html: `<div class="custom-css-pin-wrapper" style="--pin-color: ${color};"><div class="custom-css-pin"></div></div>`, iconSize: [24, 24], iconAnchor: [12, 24], popupAnchor: [0, -24] });
-        
-        function getMyName() { return userNameInput.value.trim() || 'ユーザー'; }
-        function getMyColor() { return userColorInput.value; }
-
-        function renderPin(pin) {
-            if (pinsData[pin.id]) map.removeLayer(pinsData[pin.id].marker);
-            const marker = L.marker([pin.lat, pin.lng], {icon: getPinIcon(pin.color)}).addTo(map);
-            marker.bindPopup(`<div style="color:#000; font-size:12px;"><b>${pin.title}</b><br><span style="font-size:10px;color:#666;">by ${pin.author}</span><br>${pin.desc}<br><button onclick="deletePin('${pin.id}')" style="background:var(--danger); color:#fff; border:none; border-radius:4px; padding:4px 8px; margin-top:5px; cursor:pointer; font-size:10px;">削除</button></div>`);
-            pinsData[pin.id] = { data: pin, marker: marker };
-        }
-        
-        window.deletePin = (id) => {
-            if (pinsData[id]) { map.removeLayer(pinsData[id].marker); delete pinsData[id]; }
-            broadcast({ type: 'delete_pin', id: id });
-            map.closePopup();
-        };
-
-        let tempPinLatLng = null;
-        const pinModal = document.getElementById('pin-modal');
-        const pinTitleInput = document.getElementById('pin-title-input');
-        const pinDescInput = document.getElementById('pin-desc-input');
-
-        const triggerPinCreation = (e) => {
-            tempPinLatLng = e.latlng;
-            pinTitleInput.value = ''; pinDescInput.value = '';
-            pinModal.classList.add('active');
-            setTimeout(() => pinTitleInput.focus(), 100);
-        };
-
-        map.on('dblclick', triggerPinCreation); 
-        map.on('contextmenu', triggerPinCreation);
-
-        document.getElementById('pin-cancel-btn').addEventListener('click', () => { pinModal.classList.remove('active'); tempPinLatLng = null; });
-        document.getElementById('pin-save-btn').addEventListener('click', () => {
-            const title = pinTitleInput.value.trim();
-            if (!title) { alert('ピンの名前を入力してください'); return; }
-            const newPin = { id: 'p'+Date.now(), lat: tempPinLatLng.lat, lng: tempPinLatLng.lng, title: title, desc: pinDescInput.value.trim(), author: getMyName(), color: getMyColor() };
-            renderPin(newPin); broadcast({ type: 'sync_pin', pin: newPin });
-            pinModal.classList.remove('active'); tempPinLatLng = null;
-        });
-
-        // ============================
-        // P2P メッシュネットワーク通信
-        // ============================
-        let peer = null; 
-        const connections = {}; 
-        const friends = {};     
-
-        let recentPeers = JSON.parse(localStorage.getItem('recentPeers') || '[]');
-        function saveRecentPeer(id) {
-            recentPeers = recentPeers.filter(p => p !== id);
-            recentPeers.unshift(id);
-            if (recentPeers.length > 5) recentPeers.pop();
-            localStorage.setItem('recentPeers', JSON.stringify(recentPeers));
-        }
-        function renderRecentPeers() {
-            const list = document.getElementById('recent-peers-list');
-            if(!list) return;
-            list.innerHTML = '';
-            if (recentPeers.length === 0) {
-                list.innerHTML = '<div style="font-size:10px; color:var(--text-sub); text-align:center;">履歴なし</div>'; return;
-            }
-            recentPeers.forEach(id => {
-                const item = document.createElement('div');
-                item.className = 'recent-peer-item'; item.innerText = id;
-                item.onclick = () => { document.getElementById('connect-id-input').value = id; };
-                list.appendChild(item);
-            });
-        }
-
-        document.getElementById('copy-my-id-btn').addEventListener('click', () => {
-            const myIdText = document.getElementById('my-peer-id').innerText;
-            navigator.clipboard.writeText(myIdText).then(() => {
-                const btn = document.getElementById('copy-my-id-btn');
-                btn.innerText = 'コピーしました！';
-                setTimeout(() => btn.innerText = '自分のIDをコピー', 2000);
-            }).catch(() => alert('コピーに失敗しました'));
-        });
-
-        function updateMemberList() {
-            const list = document.getElementById('member-list'); list.innerHTML = '';
-            const addItem = (name, color, latlng) => {
-                const item = document.createElement('div'); item.className = 'member-item';
-                item.innerHTML = `<div class="member-color" style="background:${color}"></div><div class="member-name">${name}</div>`;
-                item.onclick = () => { 
-                    if(latlng) { map.flyTo(latlng, 16); if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); } }
-                };
-                list.appendChild(item);
+        // ユーザー設定の取得
+        function getUserSettings() {
+            return {
+                name: localStorage.getItem(STORAGE_KEY_NAME) || '名無し',
+                icon: localStorage.getItem(STORAGE_KEY_ICON) || ''
             };
-            addItem(getMyName() + ' (自分)', getMyColor(), currentMarker ? currentMarker.getLatLng() : null);
-            Object.values(friends).forEach(f => addItem(f.name, f.color, f.marker ? f.marker.getLatLng() : null));
         }
 
-        function updateStatus() {
-            const count = Object.keys(connections).length;
-            document.getElementById('status-text').innerText = count > 0 ? `${count}人と接続中` : '待機中... (友達にIDを教えるか入力してね)';
-            updateMemberList();
-        }
-
-        function broadcast(payload) { Object.values(connections).forEach(c => { if(c.open) c.send(payload); }); }
-
-        function disconnectAll() {
-            Object.values(connections).forEach(c => c.close());
-            updateStatus(); alert('全員との接続を切断しました。');
-        }
-
-        // 自分のIDを固定化（ブラウザを閉じても次回同じIDになるように）
-        function initPeer() {
-            let myStoredId = localStorage.getItem('myP2PId') || Math.floor(100000 + Math.random() * 900000).toString();
-            localStorage.setItem('myP2PId', myStoredId);
-
-            peer = new Peer(myStoredId, {
-                config: { 
-                    'iceServers': [
-                        { urls: 'stun:stun.l.google.com:19302' },
-                        { urls: 'stun:stun.cloudflare.com:3478' }
-                    ] 
-                }
-            });
+        // 初期化
+        function init() {
+            loadSavedData();
+            
+            // PeerJSの初期化 (カスタムIDがあればそれを使用)
+            const customId = localStorage.getItem(STORAGE_KEY_CUSTOM_ID);
+            if (customId) {
+                peer = new Peer(customId, { debug: 2 });
+            } else {
+                peer = new Peer({ debug: 2 });
+            }
 
             peer.on('open', (id) => {
-                document.getElementById('my-peer-id').innerText = id;
-                updateStatus();
-                // ページを開き直した時に自動復帰するため、最近の接続先にアタック
-                recentPeers.forEach(peerId => {
-                    if (peerId !== id && !connections[peerId]) {
-                        setupConnection(peer.connect(peerId));
-                    }
-                });
+                myIdDisplay.textContent = id;
+                localStorage.setItem(STORAGE_KEY_MY_ID, id);
             });
 
-            peer.on('connection', (conn) => setupConnection(conn));
-            
+            // 相手からの接続要求の処理（データ通信/チャット）
+            peer.on('connection', (conn) => {
+                setupConnection(conn);
+            });
+
+            // 相手からの通話（画面共有/ビデオ）要求の処理
+            peer.on('call', (call) => {
+                // 応答する。自分が発信中ならそのストリームを返す
+                call.answer(localStream);
+                handleCallEvents(call);
+            });
+
             peer.on('error', (err) => {
+                console.error(err);
                 if (err.type === 'unavailable-id') {
-                    // もしIDが被ってたら新しく作り直す
-                    localStorage.removeItem('myP2PId');
-                    peer.destroy();
-                    initPeer();
-                }
-            });
-            peer.on('disconnected', () => { setTimeout(() => { if (peer && !peer.destroyed) peer.reconnect(); }, 3000); });
-        }
-
-        function setupConnection(conn) {
-            // 既に接続済み、または自分自身なら無視
-            if (connections[conn.peer] || conn.peer === peer.id) return;
-            
-            connections[conn.peer] = conn; 
-            if (!friends[conn.peer]) friends[conn.peer] = { name: '接続中...', color: '#6b7280' };
-            
-            conn.on('open', () => {
-                saveRecentPeer(conn.peer);
-                
-                // 自分の情報を送る
-                conn.send({ type: 'info', name: getMyName(), color: getMyColor() });
-                if (currentMarker) {
-                    const pos = currentMarker.getLatLng();
-                    conn.send({ type: 'pos', lat: pos.lat, lng: pos.lng, color: getMyColor() });
-                }
-                Object.values(pinsData).forEach(p => conn.send({ type: 'sync_pin', pin: p.data })); 
-                
-                // フルメッシュの肝: 自分の知っている他の友達のIDリストを教える
-                const knownPeers = Object.keys(connections).filter(id => id !== conn.peer);
-                if (knownPeers.length > 0) conn.send({ type: 'peers_list', ids: knownPeers });
-                
-                updateStatus();
-            });
-
-            conn.on('data', (data) => {
-                const f = friends[conn.peer]; if(!f) return;
-
-                // フルメッシュの肝2: 教えてもらった友達リストにまだ繋がってない人がいたら繋ぎに行く
-                if (data.type === 'peers_list') {
-                    data.ids.forEach(id => {
-                        if (!connections[id] && id !== peer.id) {
-                            setupConnection(peer.connect(id));
-                        }
-                    });
-                } else if (data.type === 'info') {
-                    f.name = data.name; f.color = data.color;
-                    if (!f.routeLine) f.routeLine = L.polyline([], { color: f.color, weight: 5, opacity: 0.7 }).addTo(map);
-                    f.routeLine.setStyle({ color: f.color });
-                    if (f.marker) { f.marker.setTooltipContent(f.name); f.marker.setIcon(getPulseIcon(f.color)); }
-                    updateMemberList();
-                } else if (data.type === 'pos') {
-                    if (!f.routeLine) f.routeLine = L.polyline([], { color: data.color, weight: 5, opacity: 0.7 }).addTo(map);
-                    f.routeLine.addLatLng([data.lat, data.lng]);
-                    if (!f.marker) {
-                        f.marker = L.marker([data.lat, data.lng], {icon: getPulseIcon(data.color)}).addTo(map);
-                        f.marker.bindTooltip(f.name, {permanent: true, direction: 'top', offset: [0, -8], className: 'name-tooltip'}).openTooltip();
-                    } else f.marker.setLatLng([data.lat, data.lng]);
-                    updateMemberList(); 
-                } else if (data.type === 'chat') { appendMessage(data.text, false, data.name, data.color);
-                } else if (data.type === 'sync_pin') { renderPin(data.pin);
-                } else if (data.type === 'delete_pin') { if (pinsData[data.id]) { map.removeLayer(pinsData[data.id].marker); delete pinsData[data.id]; } }
-            });
-
-            conn.on('close', () => {
-                const f = friends[conn.peer];
-                if (f) { if (f.marker) map.removeLayer(f.marker); if (f.routeLine) map.removeLayer(f.routeLine); delete friends[conn.peer]; }
-                delete connections[conn.peer]; updateStatus();
-            });
-        }
-
-        document.getElementById('connect-btn').addEventListener('click', () => {
-            document.getElementById('connect-id-input').value = '';
-            renderRecentPeers();
-            document.getElementById('connect-modal').classList.add('active');
-            if(window.innerWidth <= 768) { sidebarWrapper.classList.remove('active'); updateToggleBtn(); }
-        });
-        
-        document.getElementById('connect-cancel-btn').addEventListener('click', () => document.getElementById('connect-modal').classList.remove('active'));
-        
-        document.getElementById('connect-start-btn').addEventListener('click', () => {
-            const targetId = document.getElementById('connect-id-input').value.trim();
-            if (!targetId) { alert('相手のIDを入力してください'); return; }
-            if (targetId === peer.id) { alert('自分のIDです'); return; }
-            
-            document.getElementById('connect-modal').classList.remove('active');
-            setupConnection(peer.connect(targetId)); 
-        });
-
-        document.getElementById('disconnect-btn').addEventListener('click', disconnectAll);
-
-        const chatBadge = document.getElementById('chat-badge'); const chatMessages = document.getElementById('chat-messages'); const chatInput = document.getElementById('chat-input'); let unreadCount = 0;
-        document.getElementById('floating-chat-btn').addEventListener('click', () => {
-            chatPanel.classList.add('active'); sidebarWrapper.classList.remove('active'); updateToggleBtn();
-            unreadCount = 0; chatBadge.style.display = 'none';
-        });
-        document.getElementById('close-chat-btn').addEventListener('click', () => chatPanel.classList.remove('active'));
-
-        function appendMessage(text, isSelf, senderName, color) {
-            const msgDiv = document.createElement('div');
-            if (isSelf) { msgDiv.className = 'msg msg-self'; msgDiv.innerText = text; } 
-            else {
-                msgDiv.className = 'msg msg-friend';
-                msgDiv.innerHTML = `<div class="msg-friend-name" style="color:${color}">${senderName}</div><div>${text}</div>`;
-                if (!chatPanel.classList.contains('active')) { unreadCount++; chatBadge.style.display = 'flex'; chatBadge.innerText = unreadCount; }
-            }
-            chatMessages.appendChild(msgDiv); chatMessages.scrollTop = chatMessages.scrollHeight;
-        }
-
-        document.getElementById('chat-send').addEventListener('click', () => {
-            const text = chatInput.value.trim(); if(!text) return;
-            broadcast({ type: 'chat', text, name: getMyName(), color: getMyColor() }); appendMessage(text, true); chatInput.value = '';
-        });
-
-        function saveSettings() {
-            localStorage.setItem('mapSettings', JSON.stringify({ userName: userNameInput.value, userColor: userColorInput.value }));
-            myRouteLine.setStyle({ color: getMyColor() });
-            if (currentMarker) { currentMarker.setTooltipContent(getMyName()); currentMarker.setIcon(getPulseIcon(getMyColor())); }
-            broadcast({ type: 'info', name: getMyName(), color: getMyColor() }); updateMemberList();
-        }
-
-        function onPositionUpdate(pos) {
-            const lat = pos.coords.latitude, lng = pos.coords.longitude;
-            if (pos.coords.speed !== null && pos.coords.speed >= 0) currentSpeedMS = pos.coords.speed;
-            routeHistory.push({ lat, lng, timestamp: Date.now() }); updateDisplay(); 
-            if (!currentMarker) {
-                currentMarker = L.marker([lat, lng], {icon: getPulseIcon(getMyColor())}).addTo(map);
-                currentMarker.bindTooltip(getMyName(), {permanent: true, direction: 'top', offset: [0, -8], className: 'name-tooltip'}).openTooltip();
-                map.flyTo([lat, lng], 16);
-                updateMemberList(); 
-            } else currentMarker.setLatLng([lat, lng]);
-
-            const myLatLng = L.latLng(lat, lng);
-            Object.values(pinsData).forEach(p => {
-                const pinLatLng = L.latLng(p.data.lat, p.data.lng);
-                if (map.distance(myLatLng, pinLatLng) <= 50) {
-                    if (!p.marker.getTooltip()) p.marker.bindTooltip(p.data.title, {permanent: true, direction: 'top', offset: [0, -24], className: 'name-tooltip'}).openTooltip();
+                    alert('指定されたIDは既に使用されています。別のIDに変更してください。');
                 } else {
-                    if (p.marker.getTooltip()) p.marker.unbindTooltip();
+                    alert('エラーが発生しました: ' + err.type);
                 }
             });
 
-            broadcast({ type: 'pos', lat, lng, color: getMyColor() });
+            // 設定保存イベント
+            saveSettingsBtn.addEventListener('click', () => {
+                localStorage.setItem(STORAGE_KEY_CUSTOM_ID, myCustomIdInput.value.trim());
+                localStorage.setItem(STORAGE_KEY_NAME, myNameInput.value.trim());
+                localStorage.setItem(STORAGE_KEY_ICON, myIconInput.value.trim());
+                location.reload(); // 再読み込みして反映
+            });
+
+            // イベントリスナーの登録
+            myIdDisplay.addEventListener('click', () => {
+                navigator.clipboard.writeText(myIdDisplay.textContent);
+                alert('IDをクリップボードにコピーしました');
+            });
+
+            connectBtn.addEventListener('click', () => {
+                const targetId = targetIdInput.value.trim();
+                if (!targetId) return;
+                localStorage.setItem(STORAGE_KEY_TARGET_ID, targetId);
+                const conn = peer.connect(targetId);
+                setupConnection(conn);
+            });
+
+            shareScreenBtn.addEventListener('click', toggleScreenShare);
+            videoCallBtn.addEventListener('click', toggleVideoCall); 
+
+            chatForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                const text = chatInput.value.trim();
+                if (!text || !connection || !connection.open) return;
+                
+                const settings = getUserSettings();
+                
+                // メッセージ送信 (名前とアイコンも送る)
+                connection.send({ type: 'chat', text: text, name: settings.name, icon: settings.icon });
+                addChatMessage(text, true, settings.name, settings.icon);
+                saveChatHistory(text, true, settings.name, settings.icon);
+                chatInput.value = '';
+            });
+
+            clearChatBtn.addEventListener('click', () => {
+                if(confirm('チャット履歴を消去しますか？')) {
+                    localStorage.removeItem(STORAGE_KEY_CHAT);
+                    chatBox.innerHTML = '';
+                }
+            });
         }
 
-        if (navigator.geolocation) {
-            navigator.geolocation.watchPosition(onPositionUpdate, (e) => {}, { enableHighAccuracy: true });
+        // 接続のセットアップ
+        function setupConnection(conn) {
+            connection = conn;
+            connection.on('open', () => {
+                updateStatus('接続済み', 'text-green-500');
+                chatInput.disabled = false;
+                sendBtn.disabled = false;
+                
+                // 接続できたら、もし自分が共有/通話中なら自動的に送信する
+                if (localStream) {
+                    const call = peer.call(connection.peer, localStream);
+                    handleCallEvents(call);
+                }
+            });
+
+            connection.on('data', (data) => {
+                if (data && data.type === 'chat') {
+                    addChatMessage(data.text, false, data.name, data.icon);
+                    saveChatHistory(data.text, false, data.name, data.icon);
+                }
+            });
+
+            connection.on('close', () => {
+                updateStatus('切断されました', 'text-red-500');
+                chatInput.disabled = true;
+                sendBtn.disabled = true;
+            });
         }
 
-        window.addEventListener('DOMContentLoaded', () => {
-            updateMemberList();
-            initPeer(); // ページ読み込み時に自分のIDを確定させる
-        });
+        // 通話（メディアストリーム）のイベントハンドリング
+        function handleCallEvents(call) {
+            currentCall = call;
+            call.on('stream', (remoteStream) => {
+                remoteVideo.srcObject = remoteStream;
+                noVideoMsg.style.display = 'none';
+            });
+            call.on('close', () => {
+                remoteVideo.srcObject = null;
+                noVideoMsg.style.display = 'flex';
+            });
+        }
+
+        // ストリームの停止処理共通化
+        function stopLocalStream() {
+            if (localStream) {
+                localStream.getTracks().forEach(track => track.stop());
+                localStream = null;
+                localVideo.srcObject = null;
+                if (currentCall) {
+                    currentCall.close();
+                }
+            }
+        }
+
+        // 画面共有の開始/停止
+        async function toggleScreenShare() {
+            if (localStream && !isVideoCalling) {
+                // 停止処理
+                stopLocalStream();
+                shareScreenBtn.innerHTML = '<i class="fa-solid fa-display mr-1"></i>画面共有';
+                shareScreenBtn.classList.replace('bg-red-500', 'bg-blue-500');
+                shareScreenBtn.classList.replace('hover:bg-red-600', 'hover:bg-blue-600');
+                videoCallBtn.disabled = false;
+                return;
+            }
+
+            try {
+                if (localStream) stopLocalStream(); // ビデオ通話中なら切る
+                
+                // 開始処理
+                localStream = await navigator.mediaDevices.getDisplayMedia({
+                    video: { cursor: "always" },
+                    audio: true
+                });
+                
+                isVideoCalling = false;
+                localVideo.srcObject = localStream;
+                
+                shareScreenBtn.innerHTML = '<i class="fa-solid fa-stop mr-1"></i>共有停止';
+                shareScreenBtn.classList.replace('bg-blue-500', 'bg-red-500');
+                shareScreenBtn.classList.replace('hover:bg-blue-600', 'hover:bg-red-600');
+                
+                // ビデオ通話ボタンのリセットと無効化
+                videoCallBtn.innerHTML = '<i class="fa-solid fa-video mr-1"></i>ビデオ通話';
+                videoCallBtn.classList.replace('bg-red-500', 'bg-purple-500');
+                videoCallBtn.classList.replace('hover:bg-red-600', 'hover:bg-purple-600');
+                videoCallBtn.disabled = true;
+
+                // 共有がブラウザの機能で停止された場合のハンドリング
+                localStream.getVideoTracks()[0].onended = () => {
+                    toggleScreenShare();
+                };
+
+                // 既に接続されている相手がいれば発信
+                if (connection && connection.open) {
+                    const call = peer.call(connection.peer, localStream);
+                    handleCallEvents(call);
+                }
+
+            } catch (err) {
+                console.error("画面共有の取得に失敗しました", err);
+            }
+        }
+
+        // ビデオ通話の開始/停止
+        async function toggleVideoCall() {
+            if (localStream && isVideoCalling) {
+                // 停止処理
+                stopLocalStream();
+                videoCallBtn.innerHTML = '<i class="fa-solid fa-video mr-1"></i>ビデオ通話';
+                videoCallBtn.classList.replace('bg-red-500', 'bg-purple-500');
+                videoCallBtn.classList.replace('hover:bg-red-600', 'hover:bg-purple-600');
+                shareScreenBtn.disabled = false;
+                return;
+            }
+
+            try {
+                if (localStream) stopLocalStream(); // 画面共有中なら切る
+
+                // 開始処理
+                localStream = await navigator.mediaDevices.getUserMedia({
+                    video: true,
+                    audio: true
+                });
+                
+                isVideoCalling = true;
+                localVideo.srcObject = localStream;
+                
+                videoCallBtn.innerHTML = '<i class="fa-solid fa-stop mr-1"></i>通話停止';
+                videoCallBtn.classList.replace('bg-purple-500', 'bg-red-500');
+                videoCallBtn.classList.replace('hover:bg-purple-600', 'hover:bg-red-600');
+
+                // 画面共有ボタンのリセットと無効化
+                shareScreenBtn.innerHTML = '<i class="fa-solid fa-display mr-1"></i>画面共有';
+                shareScreenBtn.classList.replace('bg-red-500', 'bg-blue-500');
+                shareScreenBtn.classList.replace('hover:bg-red-600', 'hover:bg-blue-600');
+                shareScreenBtn.disabled = true;
+
+                // 既に接続されている相手がいれば発信
+                if (connection && connection.open) {
+                    const call = peer.call(connection.peer, localStream);
+                    handleCallEvents(call);
+                }
+
+            } catch (err) {
+                console.error("カメラ・マイクの取得に失敗しました", err);
+                alert("カメラまたはマイクのアクセスが許可されていません。");
+            }
+        }
+
+        // UI・ストレージ関連ヘルパー
+        function updateStatus(text, colorClass) {
+            connectionStatus.textContent = text;
+            connectionStatus.className = `font-semibold ${colorClass}`;
+        }
+
+        function addChatMessage(text, isSelf, name = '名無し', iconUrl = '') {
+            const wrapper = document.createElement('div');
+            wrapper.className = `flex gap-2 mb-3 ${isSelf ? 'flex-row-reverse' : 'flex-row'}`;
+            
+            // アイコン
+            const iconImg = document.createElement('img');
+            // アイコンURLがない場合はダミー画像を生成
+            iconImg.src = iconUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=random`;
+            iconImg.className = 'w-8 h-8 rounded-full object-cover shrink-0 bg-gray-200 border border-gray-300';
+            
+            // メッセージ本体
+            const msgBox = document.createElement('div');
+            msgBox.className = `message ${isSelf ? 'self' : 'peer'} text-sm flex flex-col shadow-sm`;
+            msgBox.style.margin = '0'; 
+            
+            // 名前
+            const nameSpan = document.createElement('span');
+            nameSpan.className = 'text-xs text-gray-500 mb-1 font-semibold';
+            nameSpan.textContent = name;
+            
+            // テキスト
+            const textSpan = document.createElement('span');
+            textSpan.textContent = text;
+            
+            msgBox.appendChild(nameSpan);
+            msgBox.appendChild(textSpan);
+            
+            wrapper.appendChild(iconImg);
+            wrapper.appendChild(msgBox);
+            
+            chatBox.appendChild(wrapper);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        function saveChatHistory(text, isSelf, name, icon) {
+            let history = JSON.parse(localStorage.getItem(STORAGE_KEY_CHAT) || '[]');
+            history.push({ text, isSelf, name, icon });
+            // 最大100件まで保持
+            if (history.length > 100) history.shift();
+            localStorage.setItem(STORAGE_KEY_CHAT, JSON.stringify(history));
+        }
+
+        function loadSavedData() {
+            // 設定パネルの復元
+            myCustomIdInput.value = localStorage.getItem(STORAGE_KEY_CUSTOM_ID) || '';
+            myNameInput.value = localStorage.getItem(STORAGE_KEY_NAME) || '';
+            myIconInput.value = localStorage.getItem(STORAGE_KEY_ICON) || '';
+
+            // 前回接続した相手のID
+            const savedTargetId = localStorage.getItem(STORAGE_KEY_TARGET_ID);
+            if (savedTargetId) {
+                targetIdInput.value = savedTargetId;
+            }
+
+            // チャット履歴
+            const history = JSON.parse(localStorage.getItem(STORAGE_KEY_CHAT) || '[]');
+            history.forEach(msg => {
+                addChatMessage(msg.text, msg.isSelf, msg.name, msg.icon);
+            });
+        }
+
+        // 起動
+        init();
     </script>
 </body>
 </html>
