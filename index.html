@@ -191,9 +191,8 @@
                 </div>
                 <button id="connectBtn" class="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all shadow-[0_0_10px_rgba(34,197,94,0.3)]">接続</button>
                 
-                <div class="w-px h-8 bg-slate-600/50 mx-1 hidden sm:block"></div>
-
-                <div class="flex items-center gap-2 px-1">
+                <div id="mediaControls" class="hidden items-center gap-2 px-1">
+                    <div id="mediaSeparator" class="w-px h-8 bg-slate-600/50 mx-1 hidden sm:block"></div>
                     <button id="toggleMicBtn" class="w-10 h-10 rounded-full glass-button text-slate-300" disabled title="マイク"><i class="fa-solid fa-microphone"></i></button>
                     <button id="toggleVideoBtn" class="w-10 h-10 rounded-full glass-button text-slate-300" disabled title="カメラ"><i class="fa-solid fa-video"></i></button>
                     <button id="switchCameraBtn" class="w-10 h-10 rounded-full glass-button text-slate-300 hidden sm:flex items-center justify-center" disabled title="カメラ切替"><i class="fa-solid fa-camera-rotate"></i></button>
@@ -268,13 +267,12 @@
             document.getElementById('chatInput').disabled = document.getElementById('sendBtn').disabled = false;
             document.getElementById('targetIdInput').disabled = true;
             document.getElementById('connectInputWrapper').classList.add('hidden');
+            document.getElementById('mediaControls').classList.remove('hidden');
+            document.getElementById('mediaControls').classList.add('flex');
             dom.statusText.textContent = "CONNECTED"; dom.statusText.className = "text-sm font-medium tracking-widest text-green-400 uppercase";
             dom.statusIcon.className = "fa-solid fa-check-circle text-6xl mb-6 text-green-500 opacity-80 animate-zoom";
-            
-            // ★ クラス上書き時にもベースクラスを維持
             dom.btnConnect.innerHTML = '<i class="fa-solid fa-power-off mr-1"></i>切断'; 
             dom.btnConnect.className = connectBtnBaseClass + 'btn-danger shadow-[0_0_15px_rgba(239,68,68,0.4)]';
-            
             document.getElementById('videoCallBtn').disabled = false;
             if(connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
         }
@@ -284,10 +282,10 @@
             document.getElementById('chatInput').disabled = document.getElementById('sendBtn').disabled = true;
             document.getElementById('targetIdInput').disabled = false;
             document.getElementById('connectInputWrapper').classList.remove('hidden');
+            document.getElementById('mediaControls').classList.add('hidden');
+            document.getElementById('mediaControls').classList.remove('flex');
             dom.statusText.textContent = "Waiting for connection"; dom.statusText.className = "text-sm font-medium tracking-widest text-slate-400 uppercase";
             dom.statusIcon.className = "fa-solid fa-satellite-dish text-6xl mb-6 text-slate-700";
-            
-            // ★ クラス上書き時にもベースクラスを維持
             dom.btnConnect.innerHTML = '<i class="fa-solid fa-link mr-1"></i>接続'; 
             dom.btnConnect.className = connectBtnBaseClass + 'bg-green-500 hover:bg-green-400 text-white shadow-[0_0_10px_rgba(34,197,94,0.3)]';
             
@@ -300,8 +298,17 @@
         }
 
         function initPeer() {
-            peer = config.id ? new Peer(config.id) : new Peer();
+            const iceConfig = { iceServers: [
+                { urls: 'stun:stun.l.google.com:19302' },
+                { urls: 'stun:stun1.l.google.com:19302' },
+                { urls: 'stun:stun2.l.google.com:19302' }
+            ]};
+            peer = config.id ? new Peer(config.id, { config: iceConfig }) : new Peer({ config: iceConfig });
             peer.on('open', id => document.getElementById('myIdDisplay').textContent = id);
+            peer.on('error', err => {
+                const msg = err.type === 'peer-unavailable' ? '相手が見つかりません' : 'エラー: ' + err.type;
+                disableRoomUI(); addSysMsg(msg);
+            });
 
             peer.on('connection', conn => {
                 dom.reqMsg.innerHTML = `<span class="text-blue-400">${conn.metadata?.name || '相手'}</span>`;
@@ -309,9 +316,16 @@
                 
                 document.getElementById('acceptBtn').onclick = () => {
                     dom.reqModal.classList.add('hidden');
-                    conn.send({ type: 'handshake_accept' });
-                    setupConnection(conn);
-                    enableRoomUI(); addSysMsg("相手が参加しました");
+                    conn.on('open', () => {
+                        conn.send({ type: 'handshake_accept' });
+                        setupConnection(conn);
+                        enableRoomUI(); addSysMsg("相手が参加しました");
+                    });
+                    if (conn.open) {
+                        conn.send({ type: 'handshake_accept' });
+                        setupConnection(conn);
+                        enableRoomUI(); addSysMsg("相手が参加しました");
+                    }
                 };
                 document.getElementById('rejectBtn').onclick = () => { dom.reqModal.classList.add('hidden'); conn.close(); };
             });
@@ -344,12 +358,14 @@
             connection = peer.connect(tid, { metadata: { name: config.name } });
             
             connection.on('data', data => { if (data.type === 'handshake_accept') { setupConnection(connection); enableRoomUI(); addSysMsg("接続確立しました"); } });
-            connection.on('close', () => { disableRoomUI(); addSysMsg("切断されました"); });
+            connection.on('error', () => { disableRoomUI(); addSysMsg("接続エラーが発生しました"); });
             setTimeout(() => { if (isConnecting) { if(connection) { connection.close(); connection = null; } disableRoomUI(); addSysMsg("応答がありません"); } }, 15000);
         };
 
         function setupConnection(conn) {
             connection = conn;
+            connection.on('close', () => { disableRoomUI(); addSysMsg("切断されました"); });
+            connection.on('error', () => { disableRoomUI(); addSysMsg("接続エラーが発生しました"); });
             connection.on('data', data => {
                 if (data.type === 'chat') {
                     addChat(data.text, false, data.name);
