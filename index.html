@@ -3,265 +3,264 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>P2P Connect - Premium Edition</title>
+    <title>P2P Connect</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script>
-        tailwind.config = {
-            darkMode: 'class',
-            theme: { 
-                extend: { 
-                    height: { 'screen-dvh': '100dvh' },
-                    colors: {
-                        slate: { 850: '#151e2e', 950: '#0b0f19' }
-                    }
-                } 
-            }
-        }
+        tailwind.config = { darkMode: 'class', theme: { extend: { height: { 'screen-dvh': '100dvh' } } } }
     </script>
     <style>
         @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        
-        body { font-family: 'Inter', 'Segoe UI', sans-serif; background-color: #0b0f19; color: #f8fafc; overflow: hidden; }
-        
-        /* --- プレミアム・アニメーション＆エフェクト --- */
+        body { font-family: 'Inter', sans-serif; background: #0b0f19; color: #f8fafc; overflow: hidden; }
+
         @keyframes subtleZoom { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes float { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-5px); } }
-        
-        .glass-panel { background: rgba(30, 41, 59, 0.6); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255, 255, 255, 0.08); }
-        .glass-button { background: rgba(255, 255, 255, 0.1); backdrop-filter: blur(8px); border: 1px solid rgba(255, 255, 255, 0.05); transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1); }
-        .glass-button:hover:not(:disabled) { background: rgba(255, 255, 255, 0.15); transform: translateY(-2px); border-color: rgba(255, 255, 255, 0.2); }
-        .glass-button:active:not(:disabled) { transform: translateY(0) scale(0.95); }
-        
-        .animate-zoom { animation: subtleZoom 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+        @keyframes float { 0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)} }
+
+        .glass-panel { background: rgba(30,41,59,0.65); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
+        .glass-button { background: rgba(255,255,255,0.1); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.05); transition: all 0.25s ease; }
+        .glass-button:hover:not(:disabled) { background: rgba(255,255,255,0.18); transform: translateY(-1px); }
+        .glass-button:active:not(:disabled) { transform: scale(0.95); }
+        .animate-zoom { animation: subtleZoom 0.35s cubic-bezier(0.16,1,0.3,1) forwards; }
         .animate-float { animation: float 6s ease-in-out infinite; }
 
-        /* チャットパネル */
-        #chatPanel { transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1); z-index: 40; }
-        @media (max-width: 768px) {
-            #chatPanel { position: absolute; top: 0; right: 0; bottom: 90px; width: 85%; transform: translateX(100%); border-bottom-left-radius: 1rem; border-bottom-right-radius: 1rem; }
-            #chatPanel.open { transform: translateX(0); box-shadow: -20px 0 50px rgba(0,0,0,0.5); }
-        }
-        .chat-messages { height: 100%; overflow-y: auto; scroll-behavior: smooth; }
-        .chat-messages::-webkit-scrollbar { width: 6px; }
-        .chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.2); border-radius: 10px; }
-        
-        .message { padding: 0.75rem 1rem; border-radius: 1.2rem; max-width: 85%; word-break: break-all; font-size: 0.875rem; line-height: 1.4; box-shadow: 0 4px 15px rgba(0,0,0,0.1); }
-        .message.self { background: linear-gradient(135deg, #3b82f6, #2563eb); color: white; border-bottom-right-radius: 0.25rem; }
-        .message.peer { background: #1e293b; color: #e2e8f0; border-bottom-left-radius: 0.25rem; border: 1px solid rgba(255,255,255,0.05); }
+        .video-container { position: relative; width: 100%; height: 100%; background: radial-gradient(circle at center, #1e293b 0%, #0b0f19 100%); border-radius: 1.25rem; overflow: hidden; }
 
-        /* ビデオレイアウト */
-        .video-container { position: relative; width: 100%; height: 100%; background: radial-gradient(circle at center, #1e293b 0%, #0f172a 100%); border-radius: 1.5rem; overflow: hidden; box-shadow: inset 0 0 40px rgba(0,0,0,0.8); }
-        
         #localVideoWrapper {
-            position: absolute; bottom: 90px; right: 20px; width: 25%; min-width: 100px; max-width: 160px; aspect-ratio: 3/4;
-            border-radius: 1rem; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.6); z-index: 30; transition: transform 0.3s ease, border-color 0.3s ease; border: 2px solid rgba(255,255,255,0.1);
+            position: absolute; bottom: 80px; right: 14px;
+            width: 22%; min-width: 90px; max-width: 140px; aspect-ratio: 3/4;
+            border-radius: 0.875rem; overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.7); z-index: 30;
+            border: 2px solid rgba(255,255,255,0.12); transition: border-color 0.3s;
         }
-        #localVideoWrapper:hover { border-color: rgba(59, 130, 246, 0.5); transform: translateY(-4px) scale(1.02); }
+        #localVideoWrapper:hover { border-color: rgba(59,130,246,0.5); }
         #localVideo.is-screen-share { aspect-ratio: auto; object-fit: contain; background: #000; }
 
-        /* カスタムスクロールバー */
-        ::-webkit-scrollbar { width: 8px; height: 8px; }
+        #chatPanel { transition: transform 0.35s cubic-bezier(0.16,1,0.3,1); z-index: 40; }
+        @media (max-width: 768px) {
+            #chatPanel { position: absolute; top: 0; right: 0; bottom: 78px; width: 82%; transform: translateX(100%); border-bottom-left-radius: 1rem; border-bottom-right-radius: 1rem; }
+            #chatPanel.open { transform: translateX(0); box-shadow: -20px 0 50px rgba(0,0,0,0.6); }
+        }
+        .chat-messages { overflow-y: auto; scroll-behavior: smooth; }
+        .chat-messages::-webkit-scrollbar { width: 4px; }
+        .chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
+
+        .message { padding: 0.65rem 0.9rem; border-radius: 1.1rem; max-width: 85%; word-break: break-all; font-size: 0.85rem; line-height: 1.4; }
+        .message.self { background: linear-gradient(135deg,#3b82f6,#2563eb); color: white; border-bottom-right-radius: 0.2rem; }
+        .message.peer { background: #1e293b; color: #e2e8f0; border-bottom-left-radius: 0.2rem; border: 1px solid rgba(255,255,255,0.05); }
+
+        input[type="text"], select { background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); color: white; }
+        input[type="text"]:focus, select:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
+
+        .btn-danger { background: rgba(239,68,68,0.9) !important; color: white !important; border-color: rgba(239,68,68,1) !important; }
+        .btn-active  { background: rgba(34,197,94,0.9)  !important; color: white !important; border-color: rgba(34,197,94,1)  !important; }
+
+        /* 全画面ボタン：PCはホバー時のみ表示、スマホは常時薄く表示 */
+        #fullscreenBtn { position: absolute; top: 10px; left: 10px; z-index: 35; opacity: 0; transition: opacity 0.2s; }
+        .video-container:hover #fullscreenBtn { opacity: 1; }
+        @media (max-width: 768px) { #fullscreenBtn { opacity: 0.55; } }
+
+        ::-webkit-scrollbar { width: 6px; }
         ::-webkit-scrollbar-track { background: transparent; }
         ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
-        ::-webkit-scrollbar-thumb:hover { background: #475569; }
-
-        /* 入力フィールド */
-        input[type="text"], select { background: rgba(15, 23, 42, 0.6); border: 1px solid rgba(255,255,255,0.1); color: white; }
-        input[type="text"]:focus, select:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59, 130, 246, 0.3); }
-
-        /* ミュート時の赤色 */
-        .btn-danger { background: rgba(239, 68, 68, 0.9) !important; color: white !important; border-color: rgba(239, 68, 68, 1) !important; box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3); }
-        .btn-active { background: rgba(34, 197, 94, 0.9) !important; color: white !important; border-color: rgba(34, 197, 94, 1) !important; box-shadow: 0 4px 15px rgba(34, 197, 94, 0.3); }
     </style>
 </head>
-<body class="h-screen-dvh flex flex-col p-2 md:p-4 gap-4">
+<body class="h-screen-dvh flex flex-col" style="padding:6px;gap:6px;">
 
-    <header class="glass-panel rounded-2xl px-5 py-3 flex justify-between items-center z-50 shrink-0 mx-2 md:mx-0 mt-2 md:mt-0">
-        <div class="flex items-center gap-3">
-            <div class="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shadow-lg">
-                <i class="fa-solid fa-tower-broadcast text-white"></i>
-            </div>
-            <div>
-                <h1 class="text-sm font-bold tracking-wide">P2P Connect</h1>
-                <p class="text-[10px] text-slate-400 font-mono flex items-center gap-1">
-                    <span class="w-2 h-2 rounded-full bg-green-500 animate-pulse"></span>
-                    ID: <span id="myIdDisplay" class="select-all cursor-pointer hover:text-white transition-colors">取得中...</span>
-                </p>
-            </div>
-        </div>
+    <!-- コンパクトヘッダー -->
+    <header class="glass-panel rounded-xl px-3 py-1.5 flex justify-between items-center z-50 shrink-0">
         <div class="flex items-center gap-2">
-            <button id="toggleChatBtn" class="w-10 h-10 rounded-full glass-button relative" title="チャットを表示">
-                <i class="fa-solid fa-comments text-slate-300"></i>
-                <span id="chatBadge" class="absolute top-0 right-0 bg-red-500 text-white text-[9px] font-bold w-4 h-4 rounded-full flex items-center justify-center hidden border-2 border-slate-800">!</span>
+            <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shrink-0">
+                <i class="fa-solid fa-tower-broadcast text-white text-xs"></i>
+            </div>
+            <p class="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
+                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0"></span>
+                <span class="text-slate-500">ID:</span>
+                <span id="myIdDisplay" class="text-white select-all cursor-pointer hover:text-blue-400 transition-colors font-semibold">取得中...</span>
+            </p>
+        </div>
+        <div class="flex items-center gap-1.5">
+            <button id="toggleChatBtn" class="w-8 h-8 rounded-full glass-button relative flex items-center justify-center">
+                <i class="fa-solid fa-comments text-slate-300 text-sm"></i>
+                <span id="chatBadge" class="absolute top-0 right-0 bg-red-500 text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center hidden border border-slate-800">!</span>
             </button>
-            <button id="openSettingsBtn" class="w-10 h-10 rounded-full glass-button" title="設定"><i class="fa-solid fa-gear text-slate-300"></i></button>
+            <button id="openSettingsBtn" class="w-8 h-8 rounded-full glass-button flex items-center justify-center">
+                <i class="fa-solid fa-gear text-slate-300 text-sm"></i>
+            </button>
         </div>
     </header>
 
+    <!-- 着信モーダル -->
     <div id="requestModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden">
         <div class="glass-panel rounded-3xl p-8 w-full max-w-sm text-center animate-zoom border border-slate-700 shadow-2xl">
-            <div class="w-20 h-20 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-6 relative">
+            <div class="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-5 relative">
                 <div class="absolute inset-0 bg-blue-500/30 rounded-full animate-ping"></div>
-                <i class="fa-solid fa-phone-volume text-3xl text-blue-400"></i>
+                <i class="fa-solid fa-phone-volume text-2xl text-blue-400"></i>
             </div>
-            <h3 id="requestMsg" class="text-xl font-semibold mb-2 text-white">着信</h3>
-            <p class="text-sm text-slate-400 mb-8">相手からの接続を許可しますか？</p>
-            <div class="flex gap-4">
-                <button id="rejectBtn" class="flex-1 py-3 rounded-xl font-bold bg-slate-800 text-red-400 hover:bg-slate-700 hover:text-red-300 transition-all">拒否</button>
-                <button id="acceptBtn" class="flex-1 py-3 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-500 shadow-[0_0_20px_rgba(37,99,235,0.4)] transition-all">許可</button>
+            <h3 id="requestMsg" class="text-lg font-semibold mb-1 text-white">着信</h3>
+            <p class="text-xs text-slate-400 mb-6">相手からの接続を許可しますか？</p>
+            <div class="flex gap-3">
+                <button id="rejectBtn" class="flex-1 py-2.5 rounded-xl font-bold bg-slate-800 text-red-400 hover:bg-slate-700 transition-all text-sm">拒否</button>
+                <button id="acceptBtn" class="flex-1 py-2.5 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-500 transition-all text-sm">許可</button>
             </div>
         </div>
     </div>
 
+    <!-- 設定モーダル -->
     <div id="settingsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
         <div class="glass-panel rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto animate-zoom border border-slate-700 shadow-2xl">
-            <h2 class="text-xl font-bold mb-6 text-white flex items-center"><i class="fa-solid fa-sliders text-blue-500 mr-3"></i>詳細設定</h2>
-            
-            <div class="space-y-5">
+            <h2 class="text-lg font-bold mb-5 text-white flex items-center"><i class="fa-solid fa-sliders text-blue-500 mr-2"></i>設定</h2>
+            <div class="space-y-4">
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2">希望のID (空白なら自動生成)</label>
-                    <input type="text" id="myCustomIdInput" placeholder="カスタムIDを入力" class="w-full rounded-xl px-4 py-3 text-sm transition-all">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1.5">希望のID（空欄なら自動生成）</label>
+                    <input type="text" id="myCustomIdInput" placeholder="カスタムID" class="w-full rounded-xl px-4 py-2.5 text-sm">
                 </div>
                 <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-2">表示名</label>
-                    <input type="text" id="myNameInput" placeholder="あなたの名前" class="w-full rounded-xl px-4 py-3 text-sm transition-all">
+                    <label class="block text-xs font-semibold text-slate-400 mb-1.5">表示名</label>
+                    <input type="text" id="myNameInput" placeholder="あなたの名前" class="w-full rounded-xl px-4 py-2.5 text-sm">
                 </div>
-
-                <div class="border-t border-slate-700/50 pt-5">
-                    <label class="block text-xs font-semibold text-slate-400 mb-3">デバイス設定</label>
-                    <select id="audioDeviceSelect" class="w-full rounded-xl px-4 py-3 text-sm mb-4 appearance-none"></select>
-                    
-                    <label class="flex items-center justify-between p-4 rounded-xl bg-slate-800/50 border border-slate-700 cursor-pointer hover:bg-slate-800 transition-colors">
+                <div class="border-t border-slate-700/50 pt-4">
+                    <label class="block text-xs font-semibold text-slate-400 mb-2">マイクデバイス</label>
+                    <select id="audioDeviceSelect" class="w-full rounded-xl px-4 py-2.5 text-sm mb-3 appearance-none"></select>
+                    <label class="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700 cursor-pointer hover:bg-slate-800 transition-colors">
                         <div>
                             <span class="text-sm font-semibold text-white block">Hi-Fi モード</span>
-                            <span class="text-[10px] text-slate-400">ノイズキャンセリングを無効化し音質優先</span>
+                            <span class="text-[10px] text-slate-400">ノイズキャンセリング無効・音質優先</span>
                         </div>
-                        <input type="checkbox" id="hifiModeCb" class="w-5 h-5 accent-blue-500 rounded cursor-pointer">
+                        <input type="checkbox" id="hifiModeCb" class="w-5 h-5 accent-blue-500 cursor-pointer">
                     </label>
                 </div>
             </div>
-
-            <div class="flex gap-3 mt-8">
-                <button id="closeSettingsBtn" class="flex-1 py-3 rounded-xl font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all">キャンセル</button>
-                <button id="saveSettingsBtn" class="flex-1 py-3 rounded-xl font-semibold bg-blue-600 text-white hover:bg-blue-500 shadow-lg transition-all">保存して再起動</button>
+            <div class="flex gap-3 mt-6">
+                <button id="closeSettingsBtn" class="flex-1 py-2.5 rounded-xl font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all text-sm">キャンセル</button>
+                <button id="saveSettingsBtn" class="flex-1 py-2.5 rounded-xl font-semibold bg-blue-600 text-white hover:bg-blue-500 shadow-lg transition-all text-sm">保存して再起動</button>
             </div>
         </div>
     </div>
 
-    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative gap-4 px-2 md:px-0">
+    <!-- メインエリア -->
+    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative" style="gap:6px;">
+
+        <!-- 映像エリア -->
         <div class="flex-1 flex flex-col min-h-0 relative">
             <div class="video-container">
                 <video id="remoteVideo" autoplay playsinline class="w-full h-full object-contain"></video>
-                
-                <div id="remoteMicBadge" class="absolute top-4 right-4 bg-red-500/90 text-white w-8 h-8 rounded-full flex items-center justify-center z-40 shadow-lg hidden">
+
+                <!-- 全画面ボタン -->
+                <button id="fullscreenBtn" class="w-9 h-9 rounded-full glass-button flex items-center justify-center">
+                    <i class="fa-solid fa-expand text-white text-sm"></i>
+                </button>
+
+                <div id="remoteMicBadge" class="absolute top-3 right-3 bg-red-500/90 text-white w-7 h-7 rounded-full flex items-center justify-center z-40 shadow hidden">
                     <i class="fa-solid fa-microphone-slash text-xs"></i>
                 </div>
-
                 <div id="remoteMuteStatus" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 hidden z-10 text-white">
-                    <div class="w-24 h-24 bg-slate-800 rounded-full flex items-center justify-center mb-5 shadow-[0_0_30px_rgba(0,0,0,0.5)]">
-                        <i class="fa-solid fa-video-slash text-4xl text-slate-500"></i>
+                    <div class="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4">
+                        <i class="fa-solid fa-video-slash text-3xl text-slate-500"></i>
                     </div>
-                    <p class="text-sm font-medium tracking-wide text-slate-300">相手のカメラはオフです</p>
+                    <p class="text-sm text-slate-300">相手のカメラはオフです</p>
                 </div>
 
+                <!-- 自分映像 PIP -->
                 <div id="localVideoWrapper" class="hidden">
                     <video id="localVideo" autoplay playsinline muted class="w-full h-full object-cover"></video>
-                    <div id="localMicBadge" class="absolute top-2 right-2 bg-red-500/90 text-white w-6 h-6 rounded-full flex items-center justify-center z-40 shadow hidden">
-                        <i class="fa-solid fa-microphone-slash text-[10px]"></i>
+                    <div id="localMicBadge" class="absolute top-1.5 right-1.5 bg-red-500/90 text-white w-5 h-5 rounded-full flex items-center justify-center z-40 hidden">
+                        <i class="fa-solid fa-microphone-slash text-[9px]"></i>
                     </div>
-                    <div id="localVideoOffIcon" class="absolute inset-0 flex items-center justify-center bg-slate-800 hidden backdrop-blur-md">
-                        <i class="fa-solid fa-user text-white text-3xl opacity-30"></i>
+                    <div id="localVideoOffIcon" class="absolute inset-0 flex items-center justify-center bg-slate-800 hidden">
+                        <i class="fa-solid fa-user text-white text-2xl opacity-25"></i>
                     </div>
                 </div>
 
                 <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center z-0 bg-slate-900">
                     <div class="animate-float text-center">
-                        <i id="statusIcon" class="fa-solid fa-satellite-dish text-6xl mb-6 text-slate-700"></i>
-                        <p class="text-sm font-medium tracking-widest text-slate-400 uppercase letter-spacing-2" id="mainStatusText">Waiting for connection</p>
+                        <i id="statusIcon" class="fa-solid fa-satellite-dish text-5xl mb-5 text-slate-700"></i>
+                        <p class="text-xs font-medium tracking-widest text-slate-500 uppercase" id="mainStatusText">Waiting for connection</p>
                     </div>
                 </div>
             </div>
 
-            <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 glass-panel rounded-full px-2 py-2 flex items-center gap-2 shadow-2xl z-50 w-[95%] max-w-2xl justify-between sm:justify-center">
-                <div id="connectInputWrapper" class="flex items-center gap-2 bg-slate-800/50 rounded-full p-1 pl-3 flex-1 sm:flex-none sm:min-w-[200px]">
-                    <i class="fa-solid fa-link text-slate-400 text-xs shrink-0"></i>
-                    <input type="text" id="targetIdInput" placeholder="相手のID..." class="bg-transparent border-none w-full text-sm outline-none text-white placeholder-slate-500 min-w-0">
+            <!-- ボトムコントロール -->
+            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 glass-panel rounded-full px-2 py-1.5 flex items-center gap-1.5 shadow-2xl z-50 w-[96%] max-w-xl">
+                <div id="connectInputWrapper" class="flex items-center gap-1.5 bg-slate-800/50 rounded-full px-3 py-1.5 flex-1 min-w-0">
+                    <i class="fa-solid fa-link text-slate-500 text-xs shrink-0"></i>
+                    <input type="text" id="targetIdInput" placeholder="相手のID..." class="bg-transparent border-none flex-1 text-sm outline-none text-white placeholder-slate-500 min-w-0">
                 </div>
-                <button id="connectBtn" class="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all shadow-[0_0_10px_rgba(34,197,94,0.3)]">接続</button>
-                
-                <div id="mediaControls" class="hidden items-center gap-2 px-1">
-                    <div id="mediaSeparator" class="w-px h-8 bg-slate-600/50 mx-1 hidden sm:block"></div>
-                    <button id="toggleMicBtn" class="w-10 h-10 rounded-full glass-button text-slate-300" disabled title="マイク"><i class="fa-solid fa-microphone"></i></button>
-                    <button id="toggleVideoBtn" class="w-10 h-10 rounded-full glass-button text-slate-300" disabled title="カメラ"><i class="fa-solid fa-video"></i></button>
-                    <button id="switchCameraBtn" class="w-10 h-10 rounded-full glass-button text-slate-300 hidden sm:flex items-center justify-center" disabled title="カメラ切替"><i class="fa-solid fa-camera-rotate"></i></button>
-                    <button id="screenShareBtn" class="w-10 h-10 rounded-full glass-button text-slate-300 hidden sm:flex items-center justify-center" disabled title="画面共有"><i class="fa-solid fa-display"></i></button>
-                    <button id="videoCallBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-5 py-2.5 rounded-full text-sm font-bold whitespace-nowrap transition-all shadow-[0_0_15px_rgba(37,99,235,0.4)] disabled:opacity-50 disabled:shadow-none" disabled><i class="fa-solid fa-play mr-2"></i>開始</button>
+                <button id="connectBtn" class="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all">接続</button>
+
+                <div id="mediaControls" class="hidden items-center gap-1.5">
+                    <button id="toggleMicBtn"    class="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300" disabled><i class="fa-solid fa-microphone text-sm"></i></button>
+                    <button id="toggleVideoBtn"  class="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300" disabled><i class="fa-solid fa-video text-sm"></i></button>
+                    <button id="switchCameraBtn" class="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300" disabled><i class="fa-solid fa-camera-rotate text-sm"></i></button>
+                    <button id="screenShareBtn"  class="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300" disabled><i class="fa-solid fa-display text-sm"></i></button>
+                    <button id="videoCallBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all disabled:opacity-50" disabled><i class="fa-solid fa-play mr-1.5"></i>開始</button>
                 </div>
             </div>
         </div>
 
-        <div id="chatPanel" class="w-full md:w-80 glass-panel rounded-2xl flex flex-col shrink-0 overflow-hidden shadow-2xl md:shadow-none border border-slate-700/50">
-            <div class="p-4 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center shrink-0">
-                <span class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-message text-blue-400 mr-2"></i>Messages</span>
-                <button id="closeChatBtn" class="md:hidden w-8 h-8 rounded-full glass-button flex items-center justify-center text-slate-400"><i class="fa-solid fa-xmark"></i></button>
+        <!-- チャットパネル -->
+        <div id="chatPanel" class="w-full md:w-72 glass-panel rounded-2xl flex flex-col shrink-0 overflow-hidden border border-slate-700/50">
+            <div class="px-4 py-2.5 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center shrink-0">
+                <span class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-message text-blue-400 mr-2 text-xs"></i>Messages</span>
+                <button id="closeChatBtn" class="md:hidden w-7 h-7 rounded-full glass-button flex items-center justify-center text-slate-400"><i class="fa-solid fa-xmark text-xs"></i></button>
             </div>
-            <div id="chatBox" class="chat-messages p-4 flex-1"></div>
-            <div class="p-3 bg-slate-800/50 border-t border-slate-700/50">
+            <div id="chatBox" class="chat-messages p-3 flex-1"></div>
+            <div class="p-2.5 bg-slate-800/50 border-t border-slate-700/50">
                 <form id="chatForm" class="flex gap-2 relative">
-                    <input type="text" id="chatInput" placeholder="メッセージ..." class="flex-1 rounded-full pl-4 pr-12 py-2.5 text-sm bg-slate-900 border border-slate-700 transition-all text-white" disabled>
-                    <button type="submit" id="sendBtn" class="absolute right-1 top-1 bottom-1 bg-blue-600 hover:bg-blue-500 text-white w-9 rounded-full disabled:opacity-50 transition-all flex items-center justify-center" disabled><i class="fa-solid fa-paper-plane text-xs"></i></button>
+                    <input type="text" id="chatInput" placeholder="メッセージ..." class="flex-1 rounded-full pl-4 pr-11 py-2 text-sm border border-slate-700 transition-all text-white" disabled>
+                    <button type="submit" id="sendBtn" class="absolute right-1 top-1 bottom-1 bg-blue-600 hover:bg-blue-500 text-white w-8 rounded-full disabled:opacity-50 transition-all flex items-center justify-center" disabled><i class="fa-solid fa-paper-plane text-xs"></i></button>
                 </form>
             </div>
         </div>
     </main>
 
     <script>
-        const STORAGE_KEY = 'p2p_mobile_pro_';
+        const STORAGE_KEY = 'p2p_v2_';
         let peer, connection, currentCall, localStream, screenStream;
-        let isCameraOn = false, isMicMuted = false, isVideoMuted = false, isScreenSharing = false;
-        let isConnecting = false;
+        let isCameraOn = false, isMicMuted = false, isVideoMuted = false, isScreenSharing = false, isConnecting = false;
         let currentFacingMode = 'user';
-        
-        // ★ 接続ボタンのベースクラスを定義（ここで shrink-0 と whitespace-nowrap を確実にする）
-        const connectBtnBaseClass = 'px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all ';
+        let lastTap = 0;
 
         const config = {
-            id: localStorage.getItem(STORAGE_KEY + 'id') || '',
-            name: localStorage.getItem(STORAGE_KEY + 'name') || '名無しさん',
-            hifi: localStorage.getItem(STORAGE_KEY + 'hifi') === 'true',
-            audioDev: localStorage.getItem(STORAGE_KEY + 'audio_dev') || ''
+            id:       localStorage.getItem(STORAGE_KEY+'id')        || '',
+            name:     localStorage.getItem(STORAGE_KEY+'name')      || '名無しさん',
+            hifi:     localStorage.getItem(STORAGE_KEY+'hifi')      === 'true',
+            audioDev: localStorage.getItem(STORAGE_KEY+'audio_dev') || ''
         };
 
         const dom = {
-            chatPanel: document.getElementById('chatPanel'), chatBox: document.getElementById('chatBox'),
-            reqModal: document.getElementById('requestModal'), reqMsg: document.getElementById('requestMsg'),
-            btnConnect: document.getElementById('connectBtn'), statusText: document.getElementById('mainStatusText'),
+            chatPanel:  document.getElementById('chatPanel'),
+            chatBox:    document.getElementById('chatBox'),
+            reqModal:   document.getElementById('requestModal'),
+            reqMsg:     document.getElementById('requestMsg'),
+            btnConnect: document.getElementById('connectBtn'),
+            statusText: document.getElementById('mainStatusText'),
             statusIcon: document.getElementById('statusIcon')
         };
 
+        // ---- チャット ----
         function toggleChat(force) {
             dom.chatPanel.classList.toggle('open', force !== undefined ? force : !dom.chatPanel.classList.contains('open'));
             document.getElementById('chatBadge').classList.add('hidden');
         }
         document.getElementById('toggleChatBtn').onclick = () => toggleChat();
-        document.getElementById('closeChatBtn').onclick = () => toggleChat(false);
+        document.getElementById('closeChatBtn').onclick  = () => toggleChat(false);
 
         function addChat(text, isSelf, name) {
-            const div = document.createElement('div');
-            div.className = `flex flex-col mb-4 ${isSelf ? 'items-end' : 'items-start'} animate-zoom`;
-            div.innerHTML = `<span class="text-[10px] text-slate-500 mb-1 px-1 font-medium">${name}</span><div class="message ${isSelf ? 'self' : 'peer'}">${text}</div>`;
-            dom.chatBox.appendChild(div); dom.chatBox.scrollTop = dom.chatBox.scrollHeight;
+            const w = document.createElement('div');
+            w.className = `flex flex-col mb-3 animate-zoom ${isSelf ? 'items-end' : 'items-start'}`;
+            w.innerHTML = `<span class="text-[10px] text-slate-500 mb-1 px-1">${name}</span><div class="message ${isSelf?'self':'peer'}">${text}</div>`;
+            dom.chatBox.appendChild(w); dom.chatBox.scrollTop = dom.chatBox.scrollHeight;
         }
         function addSysMsg(text) {
-            const div = document.createElement('div');
-            div.className = "text-center text-[11px] text-slate-400 my-4 bg-slate-800/80 py-1.5 px-4 rounded-full inline-block mx-auto border border-slate-700 animate-zoom"; 
-            div.textContent = text;
-            const wrapper = document.createElement('div'); wrapper.className="text-center"; wrapper.appendChild(div);
-            dom.chatBox.appendChild(wrapper); dom.chatBox.scrollTop = dom.chatBox.scrollHeight;
+            const w = document.createElement('div'); w.className = 'text-center my-3';
+            const p = document.createElement('span');
+            p.className = 'text-[11px] text-slate-400 bg-slate-800/80 border border-slate-700 py-1 px-3 rounded-full animate-zoom inline-block';
+            p.textContent = text; w.appendChild(p); dom.chatBox.appendChild(w);
+            dom.chatBox.scrollTop = dom.chatBox.scrollHeight;
         }
 
+        // ---- UI 状態切替 ----
         function enableRoomUI() {
             isConnecting = false;
             document.getElementById('chatInput').disabled = document.getElementById('sendBtn').disabled = false;
@@ -269,12 +268,14 @@
             document.getElementById('connectInputWrapper').classList.add('hidden');
             document.getElementById('mediaControls').classList.remove('hidden');
             document.getElementById('mediaControls').classList.add('flex');
-            dom.statusText.textContent = "CONNECTED"; dom.statusText.className = "text-sm font-medium tracking-widest text-green-400 uppercase";
-            dom.statusIcon.className = "fa-solid fa-check-circle text-6xl mb-6 text-green-500 opacity-80 animate-zoom";
-            dom.btnConnect.innerHTML = '<i class="fa-solid fa-power-off mr-1"></i>切断'; 
-            dom.btnConnect.className = connectBtnBaseClass + 'btn-danger shadow-[0_0_15px_rgba(239,68,68,0.4)]';
+            dom.statusText.textContent = 'CONNECTED';
+            dom.statusText.className   = 'text-xs font-medium tracking-widest text-green-400 uppercase';
+            dom.statusIcon.className   = 'fa-solid fa-check-circle text-5xl mb-5 text-green-500 animate-zoom';
+            dom.btnConnect.textContent = '';
+            dom.btnConnect.innerHTML   = '<i class="fa-solid fa-power-off mr-1"></i>切断';
+            dom.btnConnect.className   = 'bg-red-500 hover:bg-red-400 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all';
             document.getElementById('videoCallBtn').disabled = false;
-            if(connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
+            if (connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
         }
 
         function disableRoomUI() {
@@ -284,52 +285,47 @@
             document.getElementById('connectInputWrapper').classList.remove('hidden');
             document.getElementById('mediaControls').classList.add('hidden');
             document.getElementById('mediaControls').classList.remove('flex');
-            dom.statusText.textContent = "Waiting for connection"; dom.statusText.className = "text-sm font-medium tracking-widest text-slate-400 uppercase";
-            dom.statusIcon.className = "fa-solid fa-satellite-dish text-6xl mb-6 text-slate-700";
-            dom.btnConnect.innerHTML = '<i class="fa-solid fa-link mr-1"></i>接続'; 
-            dom.btnConnect.className = connectBtnBaseClass + 'bg-green-500 hover:bg-green-400 text-white shadow-[0_0_10px_rgba(34,197,94,0.3)]';
-            
+            dom.statusText.textContent = 'Waiting for connection';
+            dom.statusText.className   = 'text-xs font-medium tracking-widest text-slate-500 uppercase';
+            dom.statusIcon.className   = 'fa-solid fa-satellite-dish text-5xl mb-5 text-slate-700';
+            dom.btnConnect.innerHTML   = '<i class="fa-solid fa-link mr-1"></i>接続';
+            dom.btnConnect.className   = 'bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all';
             document.getElementById('videoCallBtn').disabled = true;
             stopLocalStream();
-            if(connection) { connection.close(); connection = null; }
+            if (connection) { connection.close(); connection = null; }
             document.getElementById('remoteVideo').srcObject = null;
             document.getElementById('remoteMuteStatus').classList.add('hidden');
             document.getElementById('remoteMicBadge').classList.add('hidden');
+            document.getElementById('noVideoMsg').style.display = '';
         }
 
+        // ---- PeerJS ----
         function initPeer() {
-            const iceConfig = { iceServers: [
+            const ice = { iceServers: [
                 { urls: 'stun:stun.l.google.com:19302' },
                 { urls: 'stun:stun1.l.google.com:19302' },
                 { urls: 'stun:stun2.l.google.com:19302' }
             ]};
-            peer = config.id ? new Peer(config.id, { config: iceConfig }) : new Peer({ config: iceConfig });
+            peer = config.id ? new Peer(config.id, { config: ice }) : new Peer({ config: ice });
             peer.on('open', id => document.getElementById('myIdDisplay').textContent = id);
             peer.on('error', err => {
                 const msg = err.type === 'peer-unavailable' ? '相手が見つかりません' : 'エラー: ' + err.type;
                 disableRoomUI(); addSysMsg(msg);
             });
-
             peer.on('connection', conn => {
-                dom.reqMsg.innerHTML = `<span class="text-blue-400">${conn.metadata?.name || '相手'}</span>`;
+                dom.reqMsg.innerHTML = `<span class="text-blue-400">${conn.metadata?.name || '相手'}</span> から着信`;
                 dom.reqModal.classList.remove('hidden');
-                
                 document.getElementById('acceptBtn').onclick = () => {
                     dom.reqModal.classList.add('hidden');
-                    conn.on('open', () => {
+                    const doAccept = () => {
                         conn.send({ type: 'handshake_accept' });
                         setupConnection(conn);
-                        enableRoomUI(); addSysMsg("相手が参加しました");
-                    });
-                    if (conn.open) {
-                        conn.send({ type: 'handshake_accept' });
-                        setupConnection(conn);
-                        enableRoomUI(); addSysMsg("相手が参加しました");
-                    }
+                        enableRoomUI(); addSysMsg('相手が参加しました');
+                    };
+                    if (conn.open) doAccept(); else conn.on('open', doAccept);
                 };
                 document.getElementById('rejectBtn').onclick = () => { dom.reqModal.classList.add('hidden'); conn.close(); };
             });
-
             peer.on('call', call => {
                 if (connection && connection.peer === call.peer) {
                     call.answer(localStream || null); handleCall(call);
@@ -338,34 +334,30 @@
         }
 
         dom.btnConnect.onclick = () => {
-            // ★ 相手に明示的に切断イベントを送ってから切るように修正
-            if (connection && connection.open) { 
+            if (connection && connection.open) {
                 connection.send({ type: 'system', action: 'disconnect' });
-                setTimeout(() => {
-                    disableRoomUI(); addSysMsg("切断しました"); 
-                }, 100);
-                return; 
+                setTimeout(() => { disableRoomUI(); addSysMsg('切断しました'); }, 100);
+                return;
             }
-            if (isConnecting) { if(connection) { connection.close(); connection = null; } disableRoomUI(); addSysMsg("キャンセルしました"); return; }
-
+            if (isConnecting) {
+                if (connection) { connection.close(); connection = null; }
+                disableRoomUI(); addSysMsg('キャンセルしました'); return;
+            }
             const tid = document.getElementById('targetIdInput').value.trim(); if (!tid) return;
-            
             isConnecting = true;
             document.getElementById('connectInputWrapper').classList.add('hidden');
             dom.btnConnect.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>待機';
-            dom.btnConnect.className = connectBtnBaseClass + 'bg-yellow-500 hover:bg-yellow-400 text-white shadow-[0_0_10px_rgba(234,179,8,0.3)]';
-            
+            dom.btnConnect.className = 'bg-yellow-500 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0';
             connection = peer.connect(tid, { metadata: { name: config.name } });
-            
-            connection.on('data', data => { if (data.type === 'handshake_accept') { setupConnection(connection); enableRoomUI(); addSysMsg("接続確立しました"); } });
-            connection.on('error', () => { disableRoomUI(); addSysMsg("接続エラーが発生しました"); });
-            setTimeout(() => { if (isConnecting) { if(connection) { connection.close(); connection = null; } disableRoomUI(); addSysMsg("応答がありません"); } }, 15000);
+            connection.on('data',  data => { if (data.type === 'handshake_accept') { setupConnection(connection); enableRoomUI(); addSysMsg('接続確立しました'); } });
+            connection.on('error', ()   => { disableRoomUI(); addSysMsg('接続エラーが発生しました'); });
+            setTimeout(() => { if (isConnecting) { if (connection) { connection.close(); connection = null; } disableRoomUI(); addSysMsg('応答がありません'); } }, 15000);
         };
 
         function setupConnection(conn) {
             connection = conn;
-            connection.on('close', () => { disableRoomUI(); addSysMsg("切断されました"); });
-            connection.on('error', () => { disableRoomUI(); addSysMsg("接続エラーが発生しました"); });
+            connection.on('close', () => { disableRoomUI(); addSysMsg('切断されました'); });
+            connection.on('error', () => { disableRoomUI(); addSysMsg('接続エラーが発生しました'); });
             connection.on('data', data => {
                 if (data.type === 'chat') {
                     addChat(data.text, false, data.name);
@@ -374,9 +366,7 @@
                     document.getElementById('remoteMuteStatus').classList.toggle('hidden', !data.video);
                     document.getElementById('remoteMicBadge').classList.toggle('hidden', !data.audio);
                 } else if (data.type === 'system' && data.action === 'disconnect') {
-                    // ★ 相手から明示的な切断メッセージが来た時の処理
-                    disableRoomUI();
-                    addSysMsg("相手が退出しました");
+                    disableRoomUI(); addSysMsg('相手が退出しました');
                 }
             });
         }
@@ -390,59 +380,98 @@
             });
             call.on('close', () => {
                 document.getElementById('remoteVideo').srcObject = null;
-                document.getElementById('noVideoMsg').style.display = 'flex';
+                document.getElementById('noVideoMsg').style.display = '';
                 document.getElementById('remoteMicBadge').classList.add('hidden');
             });
         }
 
+        // ---- 全画面 ----
+        document.getElementById('fullscreenBtn').onclick = toggleFullscreen;
+        document.querySelector('.video-container').addEventListener('touchend', e => {
+            const now = Date.now();
+            if (now - lastTap < 300) { e.preventDefault(); toggleFullscreen(); }
+            lastTap = now;
+        });
+        function toggleFullscreen() {
+            const el = document.querySelector('.video-container');
+            const btn = document.getElementById('fullscreenBtn');
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                (el.requestFullscreen || el.webkitRequestFullscreen || function(){}).call(el);
+                btn.innerHTML = '<i class="fa-solid fa-compress text-white text-sm"></i>';
+            } else {
+                (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
+                btn.innerHTML = '<i class="fa-solid fa-expand text-white text-sm"></i>';
+            }
+        }
+        ['fullscreenchange','webkitfullscreenchange'].forEach(ev =>
+            document.addEventListener(ev, () => {
+                if (!document.fullscreenElement && !document.webkitFullscreenElement)
+                    document.getElementById('fullscreenBtn').innerHTML = '<i class="fa-solid fa-expand text-white text-sm"></i>';
+            })
+        );
+
+        // ---- メディア ----
         async function prepareStream(facingMode) {
-            const audioConstraints = config.audioDev ? { deviceId: { exact: config.audioDev } } : true;
-            if (typeof audioConstraints === 'object') {
-                audioConstraints.echoCancellation = !config.hifi; audioConstraints.noiseSuppression = !config.hifi; audioConstraints.autoGainControl = !config.hifi;
-            }
+            const audioC = Object.assign(
+                config.audioDev ? { deviceId: { exact: config.audioDev } } : {},
+                { echoCancellation: !config.hifi, noiseSuppression: !config.hifi, autoGainControl: !config.hifi }
+            );
             try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: audioConstraints });
-                document.getElementById('localVideoWrapper').classList.remove('hidden'); document.getElementById('localVideo').srcObject = localStream; updateToggleButtons();
-            } catch (e) {
-                try {
-                    localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: facingMode }, audio: true });
-                    document.getElementById('localVideoWrapper').classList.remove('hidden'); document.getElementById('localVideo').srcObject = localStream; updateToggleButtons();
-                } catch(err) { alert("デバイスの起動に失敗しました。権限を確認してください。"); }
+                localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: audioC });
+            } catch {
+                try { localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: true }); }
+                catch { alert('デバイスの起動に失敗しました。権限を確認してください。'); return; }
             }
+            document.getElementById('localVideoWrapper').classList.remove('hidden');
+            document.getElementById('localVideo').srcObject = localStream;
+            updateToggleButtons();
         }
 
         document.getElementById('switchCameraBtn').onclick = async () => {
             if (!localStream || isScreenSharing) return;
             currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
             try {
-                const newStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
-                const newVideoTrack = newStream.getVideoTracks()[0];
-                localStream.removeTrack(localStream.getVideoTracks()[0]); localStream.addTrack(newVideoTrack); document.getElementById('localVideo').srcObject = localStream;
-                if (currentCall && currentCall.peerConnection) { const sender = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video'); if (sender) sender.replaceTrack(newVideoTrack); }
-                newVideoTrack.enabled = !isVideoMuted;
-            } catch (e) { alert("カメラ切替に失敗しました。"); }
+                const ns = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
+                const nv = ns.getVideoTracks()[0];
+                localStream.getVideoTracks().forEach(t => { t.stop(); localStream.removeTrack(t); });
+                localStream.addTrack(nv);
+                document.getElementById('localVideo').srcObject = localStream;
+                if (currentCall?.peerConnection) {
+                    const s = currentCall.peerConnection.getSenders().find(s => s.track?.kind === 'video');
+                    if (s) s.replaceTrack(nv);
+                }
+                nv.enabled = !isVideoMuted;
+            } catch { alert('カメラ切替に失敗しました。'); }
         };
 
         document.getElementById('screenShareBtn').onclick = async () => {
-            if (!currentCall) { alert("通話中のみ画面共有可能です。"); return; }
-            if (isScreenSharing) { stopScreenShare(); } else {
-                try {
-                    screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                    const screenTrack = screenStream.getVideoTracks()[0]; screenTrack.onended = () => stopScreenShare();
-                    if (currentCall && currentCall.peerConnection) { const sender = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video'); if (sender) sender.replaceTrack(screenTrack); }
-                    document.getElementById('localVideo').srcObject = screenStream; document.getElementById('localVideo').classList.add('is-screen-share');
-                    isScreenSharing = true; updateToggleButtons();
-                } catch (e) {}
-            }
+            if (!currentCall) { alert('通話中のみ画面共有可能です。'); return; }
+            if (isScreenSharing) { stopScreenShare(); return; }
+            try {
+                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
+                const st = screenStream.getVideoTracks()[0];
+                st.onended = () => stopScreenShare();
+                if (currentCall?.peerConnection) {
+                    const s = currentCall.peerConnection.getSenders().find(s => s.track?.kind === 'video');
+                    if (s) s.replaceTrack(st);
+                }
+                document.getElementById('localVideo').srcObject = screenStream;
+                document.getElementById('localVideo').classList.add('is-screen-share');
+                isScreenSharing = true; updateToggleButtons();
+            } catch { /* キャンセル */ }
         };
 
         function stopScreenShare() {
             if (!isScreenSharing) return;
-            isScreenSharing = false; if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
+            isScreenSharing = false;
+            if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
             document.getElementById('localVideo').classList.remove('is-screen-share');
             if (localStream) {
-                const videoTrack = localStream.getVideoTracks()[0];
-                if (currentCall && currentCall.peerConnection) { const sender = currentCall.peerConnection.getSenders().find(s => s.track.kind === 'video'); if (sender) sender.replaceTrack(videoTrack); }
+                const vt = localStream.getVideoTracks()[0];
+                if (currentCall?.peerConnection) {
+                    const s = currentCall.peerConnection.getSenders().find(s => s.track?.kind === 'video');
+                    if (s && vt) s.replaceTrack(vt);
+                }
                 document.getElementById('localVideo').srcObject = localStream;
             }
             updateToggleButtons();
@@ -450,13 +479,15 @@
 
         document.getElementById('videoCallBtn').onclick = async () => {
             if (isCameraOn) { stopLocalStream(); return; }
-            await prepareStream(currentFacingMode); isCameraOn = true;
-            document.getElementById('videoCallBtn').innerHTML = '<i class="fa-solid fa-stop mr-2"></i>停止';
+            await prepareStream(currentFacingMode);
+            if (!localStream) return;
+            isCameraOn = true;
+            document.getElementById('videoCallBtn').innerHTML = '<i class="fa-solid fa-stop mr-1.5"></i>停止';
             document.getElementById('videoCallBtn').classList.add('btn-danger');
-
-            if (connection && connection.open) {
+            if (connection?.open) {
                 if (currentCall) currentCall.close();
-                currentCall = peer.call(connection.peer, localStream); handleCall(currentCall);
+                currentCall = peer.call(connection.peer, localStream);
+                handleCall(currentCall);
                 connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
             }
         };
@@ -466,52 +497,77 @@
             if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
             isCameraOn = isMicMuted = isVideoMuted = false;
             document.getElementById('localVideoWrapper').classList.add('hidden');
-            document.getElementById('videoCallBtn').innerHTML = '<i class="fa-solid fa-play mr-2"></i>開始';
+            document.getElementById('videoCallBtn').innerHTML = '<i class="fa-solid fa-play mr-1.5"></i>開始';
             document.getElementById('videoCallBtn').classList.remove('btn-danger');
-            updateToggleButtons(); if (currentCall) { currentCall.close(); currentCall = null; }
+            updateToggleButtons();
+            if (currentCall) { currentCall.close(); currentCall = null; }
         }
 
         function updateToggleButtons() {
-            const mBtn = document.getElementById('toggleMicBtn'), vBtn = document.getElementById('toggleVideoBtn'), cBtn = document.getElementById('switchCameraBtn'), sBtn = document.getElementById('screenShareBtn');
+            const mBtn = document.getElementById('toggleMicBtn');
+            const vBtn = document.getElementById('toggleVideoBtn');
+            const cBtn = document.getElementById('switchCameraBtn');
+            const sBtn = document.getElementById('screenShareBtn');
             if (localStream) {
-                mBtn.disabled = vBtn.disabled = sBtn.disabled = false; cBtn.disabled = isScreenSharing; 
-                mBtn.className = `w-10 h-10 rounded-full glass-button ${isMicMuted ? 'btn-danger' : 'text-white'}`;
-                vBtn.className = `w-10 h-10 rounded-full glass-button ${isVideoMuted ? 'btn-danger' : 'text-white'}`;
-                cBtn.className = `w-10 h-10 rounded-full glass-button hidden sm:flex items-center justify-center ${isScreenSharing ? 'opacity-50 text-slate-500' : 'text-white'}`;
-                sBtn.className = `w-10 h-10 rounded-full glass-button hidden sm:flex items-center justify-center ${isScreenSharing ? 'btn-active' : 'text-white'}`;
-                
-                mBtn.innerHTML = isMicMuted ? '<i class="fa-solid fa-microphone-slash"></i>' : '<i class="fa-solid fa-microphone"></i>';
-                vBtn.innerHTML = isVideoMuted ? '<i class="fa-solid fa-video-slash"></i>' : '<i class="fa-solid fa-video"></i>';
+                mBtn.disabled = vBtn.disabled = sBtn.disabled = false; cBtn.disabled = isScreenSharing;
+                mBtn.className = `w-9 h-9 rounded-full glass-button flex items-center justify-center ${isMicMuted  ? 'btn-danger' : 'text-white'}`;
+                vBtn.className = `w-9 h-9 rounded-full glass-button flex items-center justify-center ${isVideoMuted ? 'btn-danger' : 'text-white'}`;
+                cBtn.className = `w-9 h-9 rounded-full glass-button flex items-center justify-center ${isScreenSharing ? 'opacity-40 text-slate-500' : 'text-white'}`;
+                sBtn.className = `w-9 h-9 rounded-full glass-button flex items-center justify-center ${isScreenSharing ? 'btn-active' : 'text-white'}`;
+                mBtn.innerHTML = `<i class="fa-solid fa-microphone${isMicMuted?'-slash':''} text-sm"></i>`;
+                vBtn.innerHTML = `<i class="fa-solid fa-video${isVideoMuted?'-slash':''} text-sm"></i>`;
                 document.getElementById('localMicBadge').classList.toggle('hidden', !isMicMuted);
             } else {
-                mBtn.disabled = vBtn.disabled = cBtn.disabled = sBtn.disabled = true;
-                mBtn.className = vBtn.className = cBtn.className = sBtn.className = 'w-10 h-10 rounded-full glass-button text-slate-500';
+                [mBtn,vBtn,cBtn,sBtn].forEach(b => {
+                    b.disabled = true;
+                    b.className = 'w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-600';
+                });
                 document.getElementById('localMicBadge').classList.add('hidden');
             }
             document.getElementById('localVideoOffIcon').classList.toggle('hidden', !isVideoMuted || isScreenSharing);
         }
 
-        document.getElementById('toggleMicBtn').onclick = () => { isMicMuted = !isMicMuted; localStream.getAudioTracks().forEach(t => t.enabled = !isMicMuted); updateToggleButtons(); if(connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted }); };
-        document.getElementById('toggleVideoBtn').onclick = () => { isVideoMuted = !isVideoMuted; localStream.getVideoTracks().forEach(t => t.enabled = !isVideoMuted); updateToggleButtons(); if(connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted }); };
+        document.getElementById('toggleMicBtn').onclick = () => {
+            isMicMuted = !isMicMuted;
+            localStream.getAudioTracks().forEach(t => t.enabled = !isMicMuted);
+            updateToggleButtons();
+            if (connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
+        };
+        document.getElementById('toggleVideoBtn').onclick = () => {
+            isVideoMuted = !isVideoMuted;
+            localStream.getVideoTracks().forEach(t => t.enabled = !isVideoMuted);
+            updateToggleButtons();
+            if (connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
+        };
 
-        document.getElementById('chatForm').onsubmit = (e) => {
-            e.preventDefault(); const text = document.getElementById('chatInput').value.trim(); if (!text || !connection) return;
-            connection.send({ type: 'chat', text, name: config.name }); addChat(text, true, config.name); document.getElementById('chatInput').value = '';
+        document.getElementById('chatForm').onsubmit = e => {
+            e.preventDefault();
+            const text = document.getElementById('chatInput').value.trim();
+            if (!text || !connection) return;
+            connection.send({ type: 'chat', text, name: config.name });
+            addChat(text, true, config.name);
+            document.getElementById('chatInput').value = '';
         };
 
         document.getElementById('openSettingsBtn').onclick = async () => {
-            document.getElementById('myCustomIdInput').value = config.id; document.getElementById('myNameInput').value = config.name; document.getElementById('hifiModeCb').checked = config.hifi;
+            document.getElementById('myCustomIdInput').value = config.id;
+            document.getElementById('myNameInput').value = config.name;
+            document.getElementById('hifiModeCb').checked = config.hifi;
             try {
-                const devices = await navigator.mediaDevices.enumerateDevices(); const audioInputs = devices.filter(d => d.kind === 'audioinput');
-                document.getElementById('audioDeviceSelect').innerHTML = audioInputs.length > 0 ? audioInputs.map(d => `<option value="${d.deviceId}" ${d.deviceId === config.audioDev ? 'selected' : ''} class="bg-slate-800">${d.label || 'マイク (' + d.deviceId.slice(0, 5) + '...)'}</option>`).join('') : '<option value="">デバイス取得不可</option>';
-            } catch(e) { document.getElementById('audioDeviceSelect').innerHTML = '<option value="">取得失敗</option>'; }
+                const devs = await navigator.mediaDevices.enumerateDevices();
+                const ins  = devs.filter(d => d.kind === 'audioinput');
+                document.getElementById('audioDeviceSelect').innerHTML = ins.length
+                    ? ins.map(d => `<option value="${d.deviceId}" ${d.deviceId===config.audioDev?'selected':''} class="bg-slate-800">${d.label||'マイク('+d.deviceId.slice(0,5)+'...)'}</option>`).join('')
+                    : '<option value="">デバイス取得不可</option>';
+            } catch { document.getElementById('audioDeviceSelect').innerHTML = '<option value="">取得失敗</option>'; }
             document.getElementById('settingsModal').classList.remove('hidden');
         };
-
         document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
-        document.getElementById('saveSettingsBtn').onclick = () => {
-            localStorage.setItem(STORAGE_KEY + 'id', document.getElementById('myCustomIdInput').value.trim()); localStorage.setItem(STORAGE_KEY + 'name', document.getElementById('myNameInput').value.trim());
-            localStorage.setItem(STORAGE_KEY + 'hifi', document.getElementById('hifiModeCb').checked); localStorage.setItem(STORAGE_KEY + 'audio_dev', document.getElementById('audioDeviceSelect').value);
+        document.getElementById('saveSettingsBtn').onclick  = () => {
+            localStorage.setItem(STORAGE_KEY+'id',        document.getElementById('myCustomIdInput').value.trim());
+            localStorage.setItem(STORAGE_KEY+'name',      document.getElementById('myNameInput').value.trim());
+            localStorage.setItem(STORAGE_KEY+'hifi',      document.getElementById('hifiModeCb').checked);
+            localStorage.setItem(STORAGE_KEY+'audio_dev', document.getElementById('audioDeviceSelect').value);
             location.reload();
         };
 
