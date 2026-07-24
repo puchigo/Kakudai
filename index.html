@@ -32,40 +32,30 @@
             color: var(--text-main);
             font-family: 'Courier New', Courier, monospace, sans-serif;
             height: 100vh;
+            height: 100dvh; 
             width: 100vw;
             overflow: hidden;
             display: flex;
-            flex-direction: column;
             align-items: center;
             justify-content: center;
         }
 
         .app-container {
             width: 100%;
-            max-width: 420px;
             height: 100%;
+            max-width: 480px; 
             display: flex;
             flex-direction: column;
             background-color: var(--army-panel);
-            border: 4px solid var(--army-border);
-            box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 30px rgba(0,0,0,0.9);
+            border-left: 2px solid var(--army-border);
+            border-right: 2px solid var(--army-border);
+            box-shadow: 0 0 30px rgba(0,0,0,0.9);
             position: relative;
         }
 
-        /* Rivet accents */
-        .app-container::before, .app-container::after {
-            content: "•";
-            position: absolute;
-            top: 2px;
-            font-size: 1.2rem;
-            color: #556250;
-        }
-        .app-container::before { left: 8px; }
-        .app-container::after { right: 8px; }
-
-        /* Header */
+        /* Header - 少し大きく */
         .header {
-            padding: 8px 12px;
+            padding: 12px 16px;
             text-align: center;
             border-bottom: 2px solid var(--army-border);
             display: flex;
@@ -76,7 +66,7 @@
             flex-shrink: 0;
         }
         .header h1 {
-            font-size: 0.9rem;
+            font-size: 1rem;
             font-weight: bold;
             color: var(--text-main);
             display: flex;
@@ -90,7 +80,7 @@
             gap: 10px;
         }
         .user-count {
-            font-size: 0.8rem;
+            font-size: 0.85rem;
             color: var(--tactical-amber);
             font-weight: bold;
             text-shadow: 0 0 4px rgba(255,179,0,0.5);
@@ -109,9 +99,9 @@
             box-shadow: 0 0 10px var(--tactical-green);
         }
 
-        /* Display Panel (Waveform / Scope) - 比率固定: 4 */
+        /* 波形ディスプレイ - 相対的に小さくなる */
         .display-panel {
-            padding: 8px 12px;
+            padding: 10px 14px;
             display: flex;
             flex-direction: column;
             align-items: center;
@@ -119,8 +109,8 @@
             background: #080a07;
             border-bottom: 2px solid var(--army-border);
             position: relative;
-            flex: 4;
-            min-height: 0;
+            flex: 1; 
+            min-height: 80px; /* 他が大きくなった分、最小高さは少し抑える */
         }
         
         canvas {
@@ -134,10 +124,10 @@
 
         .scope-overlay {
             position: absolute;
-            top: 14px;
-            bottom: 14px;
-            left: 18px;
-            font-size: 0.6rem;
+            top: 16px;
+            bottom: 16px;
+            left: 20px;
+            font-size: 0.7rem;
             font-weight: bold;
             opacity: 0.75;
             letter-spacing: 2px;
@@ -149,21 +139,19 @@
         .scope-overlay .rx-label { color: var(--tactical-green); }
         .scope-overlay .tx-label { color: var(--tactical-amber); }
 
-        /* Controls - 比率固定: 4 */
+        /* コントロールエリア - 全体的に大きく */
         .controls {
-            padding: 10px;
+            padding: 16px;
             display: flex;
             flex-direction: column;
-            gap: 10px;
+            gap: 14px;
             background: var(--army-panel);
-            flex: 4;
-            min-height: 0;
-            justify-content: center;
+            flex-shrink: 0;
         }
 
         .freq-block {
             background: var(--army-dark);
-            padding: 10px;
+            padding: 12px 14px;
             border: 2px solid var(--army-border);
             border-radius: 4px;
             display: flex;
@@ -177,7 +165,7 @@
             align-items: center;
         }
         .freq-header span {
-            font-size: 0.7rem;
+            font-size: 0.8rem;
             color: var(--text-muted);
             font-weight: bold;
         }
@@ -185,14 +173,14 @@
         .freq-adjust {
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
         }
         .btn-sm {
             background: #1a2118;
             border: 1px solid var(--army-border);
             color: var(--text-main);
-            width: 40px;
-            height: 40px;
+            width: 50px; /* ボタンを大きく */
+            height: 50px;
             border-radius: 4px;
             cursor: pointer;
             display: flex;
@@ -200,6 +188,9 @@
             justify-content: center;
             box-shadow: 0 2px 0 #000;
             transition: all 0.1s;
+        }
+        .btn-sm .material-icons {
+            font-size: 1.5rem; /* アイコンも少し大きく */
         }
         .btn-sm:active:not(:disabled) {
             transform: translateY(2px);
@@ -217,15 +208,16 @@
             align-items: center;
             justify-content: space-between;
             background: #000;
-            padding: 6px 10px;
+            padding: 6px 14px;
             border: 1px solid var(--army-border);
+            height: 50px;
         }
         .freq-selector input[type="number"] {
             width: 100%;
             background: transparent;
             border: none;
             color: var(--tactical-amber);
-            font-size: 1.6rem;
+            font-size: 1.8rem; /* フォントサイズ大きく */
             font-family: 'Courier New', monospace;
             font-weight: bold;
             text-align: center;
@@ -239,26 +231,29 @@
 
         .btn-group {
             display: flex;
-            gap: 8px;
+            gap: 12px;
         }
         
         .btn {
             flex: 1;
-            padding: 12px;
+            padding: 16px; /* ボタンの厚みを増す */
             border: 2px solid #1a1a1a;
-            border-radius: 2px;
-            font-size: 0.9rem;
+            border-radius: 4px;
+            font-size: 1.05rem; /* フォントサイズ大きく */
             font-weight: bold;
             font-family: inherit;
             cursor: pointer;
             display: flex;
             align-items: center;
             justify-content: center;
-            gap: 6px;
+            gap: 8px;
             transition: all 0.1s;
             color: #ffffff;
             text-transform: uppercase;
             box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 3px 0 #000;
+        }
+        .btn .material-icons {
+            font-size: 1.2rem;
         }
         .btn-connect { background-color: #384d31; }
         .btn-connect.active {
@@ -278,26 +273,25 @@
             cursor: not-allowed;
         }
 
-        /* PTT Switch - 比率固定: 3 */
+        /* PTT Switch - 存在感を圧倒的にデカく */
         .ptt-container {
-            padding: 10px 14px 14px 14px;
+            padding: 16px 16px 20px 16px;
             display: flex;
             justify-content: center;
             align-items: center;
             background: var(--army-dark);
             border-top: 2px solid var(--army-border);
-            flex: 3;
-            min-height: 0;
+            flex-shrink: 0;
         }
         .ptt-btn {
             width: 100%;
-            height: 100%;
+            height: 130px; /* PTTボタンをガッツリ大きく */
             border-radius: 8px;
             background: linear-gradient(180deg, #4a5d35 0%, #2f3d20 100%);
             border: 6px solid #1a1d18;
             box-shadow: 0 6px 0 #0d0f0c, inset 0 3px 8px rgba(255,255,255,0.15);
             color: #ffffff;
-            font-size: 1.2rem;
+            font-size: 1.3rem; /* 文字も大きく */
             font-weight: bold;
             font-family: inherit;
             cursor: pointer;
@@ -307,11 +301,11 @@
             justify-content: center;
             transition: all 0.1s;
             text-shadow: 0 2px 2px rgba(0,0,0,0.8);
-            letter-spacing: 2px;
+            letter-spacing: 3px;
         }
         .ptt-btn .material-icons {
-            font-size: 3.2rem; 
-            margin-bottom: 2px;
+            font-size: 3.4rem; /* マイクアイコンもデカく */
+            margin-bottom: 4px;
         }
         .ptt-btn:active, .ptt-btn.active {
             transform: translateY(6px); 
@@ -331,36 +325,37 @@
         /* Toast Notifications */
         #toast-container {
             position: fixed;
-            top: 20px;
-            left: 20px;
+            top: 16px;
+            left: 50%;
+            transform: translateX(-50%);
             display: flex;
             flex-direction: column;
             gap: 8px;
             z-index: 9999;
             pointer-events: none;
-            width: 300px;
-            max-width: calc(100vw - 40px);
+            width: 320px;
+            max-width: calc(100vw - 32px);
         }
         .toast {
             background-color: rgba(18, 24, 16, 0.95);
             color: var(--text-main);
-            padding: 10px 14px;
-            border-radius: 2px;
+            padding: 12px 16px;
+            border-radius: 4px;
             border: 1px solid var(--army-border);
             border-left: 5px solid var(--tactical-amber);
-            font-size: 0.85rem;
+            font-size: 0.9rem;
             box-shadow: 0 4px 12px rgba(0,0,0,0.6);
-            animation: slideInLeft 0.3s ease forwards, fadeOut 0.3s ease 2.7s forwards;
+            animation: slideInDown 0.3s ease forwards, fadeOut 0.3s ease 2.7s forwards;
             display: flex;
             align-items: center;
-            gap: 8px;
+            gap: 10px;
             font-family: monospace;
         }
         .toast.error { border-left-color: var(--tactical-red); }
         
-        @keyframes slideInLeft {
-            from { opacity: 0; transform: translateX(-30px); }
-            to { opacity: 1; transform: translateX(0); }
+        @keyframes slideInDown {
+            from { opacity: 0; transform: translateY(-20px); }
+            to { opacity: 1; transform: translateY(0); }
         }
         @keyframes fadeOut {
             from { opacity: 1; }
@@ -374,7 +369,7 @@
 
 <div class="app-container">
     <div class="header">
-        <h1><span class="material-icons" style="font-size: 1.1rem; color: var(--tactical-amber);">radar</span> AN/PRC-100 COMM</h1>
+        <h1><span class="material-icons" style="font-size: 1.2rem; color: var(--tactical-amber);">radar</span> AN/PRC-100 COMM</h1>
         <div class="status-container">
             <span id="user-count" class="user-count">USERS: 0</span>
             <div id="status-indicator" class="status-dot" title="未接続"></div>
@@ -399,7 +394,7 @@
             <div class="freq-adjust">
                 <button id="freq-down" class="btn-sm"><span class="material-icons">remove</span></button>
                 <div class="freq-selector">
-                    <span class="material-icons" style="color: var(--text-muted); font-size: 1.2rem;">tune</span>
+                    <span class="material-icons" style="color: var(--text-muted); font-size: 1.4rem;">tune</span>
                     <input type="number" id="freq-input" min="1" max="10000" value="1234">
                 </div>
                 <button id="freq-up" class="btn-sm"><span class="material-icons">add</span></button>
@@ -408,10 +403,10 @@
 
         <div class="btn-group">
             <button id="btn-connect" class="btn btn-connect">
-                <span class="material-icons" style="font-size: 1rem;">settings_input_antenna</span> 接続
+                <span class="material-icons">settings_input_antenna</span> 接続
             </button>
             <button id="btn-disconnect" class="btn btn-disconnect" disabled>
-                <span class="material-icons" style="font-size: 1rem;">power_off</span> 切断
+                <span class="material-icons">power_off</span> 切断
             </button>
         </div>
     </div>
@@ -464,8 +459,8 @@
     });
 
     function resizeCanvas() {
-        canvas.width = canvas.parentElement.clientWidth - 24; 
-        canvas.height = canvas.parentElement.clientHeight - 16;
+        canvas.width = canvas.parentElement.clientWidth - 28; 
+        canvas.height = canvas.parentElement.clientHeight - 20;
     }
 
     function setFrequencyValue(val) {
@@ -492,7 +487,7 @@
 
         const toast = document.createElement('div');
         toast.className = `toast ${isError ? 'error' : ''}`;
-        toast.innerHTML = `<span class="material-icons" style="font-size: 1rem;">${isError ? 'warning' : 'radar'}</span> ${message}`;
+        toast.innerHTML = `<span class="material-icons" style="font-size: 1.2rem;">${isError ? 'warning' : 'radar'}</span> ${message}`;
         toastContainer.appendChild(toast);
         
         setTimeout(() => { if(toast.parentElement) toast.remove(); }, 3000);
@@ -535,7 +530,7 @@
             
             dataConn.on('open', () => {
                 showToast("周波数 " + freqInput.value + " MHz に同期しました");
-                updateUIConnected(); // 接続フラグを先にONにして人数更新に反映させる
+                updateUIConnected(); 
                 setupDataConnection(dataConn, hostId);
                 const mediaCall = peer.call(hostId, localStream);
                 setupMediaCall(mediaCall, hostId);
@@ -565,7 +560,7 @@
         peer.on('open', (id) => {
             myPeerId = id;
             showToast("周波数 " + freqInput.value + " MHz を確保。待機中...");
-            updateUIConnected(); // ここでも接続フラグをONにして人数を反映
+            updateUIConnected(); 
         });
 
         peer.on('connection', (conn) => {
@@ -666,8 +661,6 @@
         freqInput.disabled = true;
         btnFreqDown.disabled = true;
         btnFreqUp.disabled = true;
-        
-        // フラグをtrueにした直後に人数を再計算して確実に反映させる
         updateCountUI();
     }
 
@@ -743,7 +736,6 @@
         canvasCtx.fillStyle = '#050d05';
         canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
 
-        // 中央区切り線
         canvasCtx.lineWidth = 1;
         canvasCtx.strokeStyle = 'rgba(0, 255, 102, 0.2)';
         canvasCtx.beginPath();
@@ -757,10 +749,7 @@
             return;
         }
 
-        // 上段：RX (緑)
         drawSingleLine(rxAnalyser, rxDataArray, canvas.height * 0.25, '#00ff66', (connectedPeers.size === 0));
-
-        // 下段：TX (オレンジ)
         drawSingleLine(txAnalyser, txDataArray, canvas.height * 0.75, '#ffb300', false);
     }
 
