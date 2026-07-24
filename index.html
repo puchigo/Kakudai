@@ -1,577 +1,821 @@
 <!DOCTYPE html>
-<html lang="ja" class="dark">
+<html lang="ja">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>P2P Connect</title>
-    <script src="https://cdn.tailwindcss.com"></script>
-    <script src="https://unpkg.com/peerjs@1.5.2/dist/peerjs.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
-    <script>
-        tailwind.config = { darkMode: 'class', theme: { extend: { height: { 'screen-dvh': '100dvh' } } } }
-    </script>
+    <title>MILITARY TRANSCEIVER - AN/PRC-100</title>
+    <script src="https://unpkg.com/peerjs@1.5.1/dist/peerjs.min.js"></script>
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons" rel="stylesheet">
     <style>
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
-        body { font-family: 'Inter', sans-serif; background: #0b0f19; color: #f8fafc; overflow: hidden; }
-
-        @keyframes subtleZoom { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }
-        @keyframes float { 0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)} }
-
-        .glass-panel { background: rgba(30,41,59,0.65); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); border: 1px solid rgba(255,255,255,0.08); }
-        .glass-button { background: rgba(255,255,255,0.1); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,0.05); transition: all 0.25s ease; }
-        .glass-button:hover:not(:disabled) { background: rgba(255,255,255,0.18); transform: translateY(-1px); }
-        .glass-button:active:not(:disabled) { transform: scale(0.95); }
-        .animate-zoom { animation: subtleZoom 0.35s cubic-bezier(0.16,1,0.3,1) forwards; }
-        .animate-float { animation: float 6s ease-in-out infinite; }
-
-        .video-container { position: relative; width: 100%; height: 100%; background: radial-gradient(circle at center, #1e293b 0%, #0b0f19 100%); border-radius: 1.25rem; overflow: hidden; }
-
-        #localVideoWrapper {
-            position: absolute; bottom: 80px; right: 14px;
-            width: 22%; min-width: 90px; max-width: 140px; aspect-ratio: 3/4;
-            border-radius: 0.875rem; overflow: hidden;
-            box-shadow: 0 8px 24px rgba(0,0,0,0.7); z-index: 30;
-            border: 2px solid rgba(255,255,255,0.12); transition: border-color 0.3s;
+        :root {
+            --army-bg: #0f120e;
+            --army-panel: #232a20;
+            --army-border: #3b4737;
+            --army-dark: #151a13;
+            --tactical-green: #00ff66;
+            --tactical-amber: #ffb300;
+            --tactical-red: #ff3333;
+            --text-main: #d0ded0;
+            --text-muted: #6b7a67;
         }
-        #localVideoWrapper:hover { border-color: rgba(59,130,246,0.5); }
-        #localVideo.is-screen-share { aspect-ratio: auto; object-fit: contain; background: #000; }
 
-        #chatPanel { transition: transform 0.35s cubic-bezier(0.16,1,0.3,1); z-index: 40; }
-        @media (max-width: 768px) {
-            #chatPanel { position: absolute; top: 0; right: 0; bottom: 78px; width: 82%; transform: translateX(100%); border-bottom-left-radius: 1rem; border-bottom-right-radius: 1rem; }
-            #chatPanel.open { transform: translateX(0); box-shadow: -20px 0 50px rgba(0,0,0,0.6); }
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            user-select: none;
+            -webkit-user-select: none;
         }
-        .chat-messages { overflow-y: auto; scroll-behavior: smooth; }
-        .chat-messages::-webkit-scrollbar { width: 4px; }
-        .chat-messages::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.15); border-radius: 10px; }
 
-        .message { padding: 0.65rem 0.9rem; border-radius: 1.1rem; max-width: 85%; word-break: break-all; font-size: 0.85rem; line-height: 1.4; }
-        .message.self { background: linear-gradient(135deg,#3b82f6,#2563eb); color: white; border-bottom-right-radius: 0.2rem; }
-        .message.peer { background: #1e293b; color: #e2e8f0; border-bottom-left-radius: 0.2rem; border: 1px solid rgba(255,255,255,0.05); }
+        body {
+            background-color: var(--army-bg);
+            color: var(--text-main);
+            font-family: 'Courier New', Courier, monospace, sans-serif;
+            height: 100vh;
+            width: 100vw;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
 
-        input[type="text"], select { background: rgba(15,23,42,0.6); border: 1px solid rgba(255,255,255,0.1); color: white; }
-        input[type="text"]:focus, select:focus { border-color: #3b82f6; outline: none; box-shadow: 0 0 0 2px rgba(59,130,246,0.25); }
+        .app-container {
+            width: 100%;
+            max-width: 420px;
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            background-color: var(--army-panel);
+            border: 4px solid var(--army-border);
+            box-shadow: inset 0 0 10px rgba(0,0,0,0.8), 0 0 30px rgba(0,0,0,0.9);
+            position: relative;
+        }
 
-        .btn-danger { background: rgba(239,68,68,0.9) !important; color: white !important; border-color: rgba(239,68,68,1) !important; }
-        .btn-active  { background: rgba(34,197,94,0.9)  !important; color: white !important; border-color: rgba(34,197,94,1)  !important; }
+        /* Rivet accents */
+        .app-container::before, .app-container::after {
+            content: "•";
+            position: absolute;
+            top: 2px;
+            font-size: 1.2rem;
+            color: #556250;
+        }
+        .app-container::before { left: 8px; }
+        .app-container::after { right: 8px; }
 
-        /* 全画面ボタン：PCはホバー時のみ表示、スマホは常時薄く表示 */
-        #fullscreenBtn { position: absolute; top: 10px; left: 10px; z-index: 35; opacity: 0; transition: opacity 0.2s; }
-        .video-container:hover #fullscreenBtn { opacity: 1; }
-        @media (max-width: 768px) { #fullscreenBtn { opacity: 0.55; } }
+        /* Header */
+        .header {
+            padding: 8px 12px;
+            text-align: center;
+            border-bottom: 2px solid var(--army-border);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: var(--army-dark);
+            letter-spacing: 1px;
+            flex-shrink: 0;
+        }
+        .header h1 {
+            font-size: 0.9rem;
+            font-weight: bold;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        
+        .status-container {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .user-count {
+            font-size: 0.8rem;
+            color: var(--tactical-amber);
+            font-weight: bold;
+            text-shadow: 0 0 4px rgba(255,179,0,0.5);
+        }
+        .status-dot {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background-color: var(--tactical-red);
+            border: 2px solid #000;
+            box-shadow: 0 0 4px var(--tactical-red);
+            transition: all 0.3s ease;
+        }
+        .status-dot.connected {
+            background-color: var(--tactical-green);
+            box-shadow: 0 0 10px var(--tactical-green);
+        }
 
-        ::-webkit-scrollbar { width: 6px; }
-        ::-webkit-scrollbar-track { background: transparent; }
-        ::-webkit-scrollbar-thumb { background: #334155; border-radius: 4px; }
+        /* Display Panel (Waveform / Scope) - 縦余白を吸収してダイナミックに伸縮 */
+        .display-panel {
+            padding: 8px 12px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            background: #080a07;
+            border-bottom: 2px solid var(--army-border);
+            position: relative;
+            flex: 1;
+            min-height: 120px;
+        }
+        
+        canvas {
+            width: 100%;
+            height: 100%;
+            background-color: #050d05;
+            border: 2px solid #2a3826;
+            border-radius: 4px;
+            box-shadow: inset 0 0 15px rgba(0,255,102,0.15);
+        }
+
+        .scope-overlay {
+            position: absolute;
+            top: 14px;
+            bottom: 14px;
+            left: 18px;
+            font-size: 0.6rem;
+            font-weight: bold;
+            opacity: 0.75;
+            letter-spacing: 2px;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            pointer-events: none;
+        }
+        .scope-overlay .rx-label { color: var(--tactical-green); }
+        .scope-overlay .tx-label { color: var(--tactical-amber); }
+
+        /* Controls - 余計なすきまを排除してコンパクトに整列 */
+        .controls {
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+            background: var(--army-panel);
+            flex-shrink: 0;
+        }
+
+        .freq-block {
+            background: var(--army-dark);
+            padding: 10px;
+            border: 2px solid var(--army-border);
+            border-radius: 4px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .freq-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .freq-header span {
+            font-size: 0.7rem;
+            color: var(--text-muted);
+            font-weight: bold;
+        }
+
+        .freq-adjust {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        .btn-sm {
+            background: #1a2118;
+            border: 1px solid var(--army-border);
+            color: var(--text-main);
+            width: 40px;
+            height: 40px;
+            border-radius: 4px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 2px 0 #000;
+            transition: all 0.1s;
+        }
+        .btn-sm:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: 0 0 0 #000;
+            background: #232d20;
+        }
+        .btn-sm:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .freq-selector {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            background: #000;
+            padding: 6px 10px;
+            border: 1px solid var(--army-border);
+        }
+        .freq-selector input[type="number"] {
+            width: 100%;
+            background: transparent;
+            border: none;
+            color: var(--tactical-amber);
+            font-size: 1.6rem;
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            text-align: center;
+            outline: none;
+        }
+        .freq-selector input::-webkit-outer-spin-button,
+        .freq-selector input::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        /* 接続・切断ボタン（周波数入力欄のすぐ下に連続して配置） */
+        .btn-group {
+            display: flex;
+            gap: 8px;
+        }
+        
+        .btn {
+            flex: 1;
+            padding: 12px;
+            border: 2px solid #1a1a1a;
+            border-radius: 2px;
+            font-size: 0.9rem;
+            font-weight: bold;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 6px;
+            transition: all 0.1s;
+            color: #ffffff;
+            text-transform: uppercase;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 3px 0 #000;
+        }
+        .btn-connect { background-color: #384d31; }
+        .btn-connect.active {
+            background-color: #2e7d32;
+            border-color: var(--tactical-green);
+        }
+        .btn-disconnect { background-color: #4a3333; }
+        .btn:active:not(:disabled) {
+            transform: translateY(2px);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,0.2), 0 1px 0 #000;
+        }
+        .btn:disabled {
+            background-color: #222621;
+            color: #4d544c;
+            border-color: #1a1d19;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
+
+        /* PTT Switch */
+        .ptt-container {
+            padding: 10px 14px 14px 14px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: var(--army-dark);
+            border-top: 2px solid var(--army-border);
+            flex-shrink: 0;
+        }
+        .ptt-btn {
+            width: 100%;
+            height: 120px; 
+            border-radius: 8px;
+            background: linear-gradient(180deg, #4a5d35 0%, #2f3d20 100%);
+            border: 6px solid #1a1d18;
+            box-shadow: 0 6px 0 #0d0f0c, inset 0 3px 8px rgba(255,255,255,0.15);
+            color: #ffffff;
+            font-size: 1.2rem;
+            font-weight: bold;
+            font-family: inherit;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s;
+            text-shadow: 0 2px 2px rgba(0,0,0,0.8);
+            letter-spacing: 2px;
+        }
+        .ptt-btn .material-icons {
+            font-size: 3.2rem; 
+            margin-bottom: 2px;
+        }
+        .ptt-btn:active, .ptt-btn.active {
+            transform: translateY(6px); 
+            box-shadow: 0 0 0 #0d0f0c, inset 0 6px 12px rgba(0,0,0,0.7);
+            background: linear-gradient(180deg, #384728 0%, #1d2613 100%);
+            color: var(--tactical-amber);
+        }
+        .ptt-btn:disabled {
+            background: #2b302a;
+            color: #4d544c;
+            box-shadow: none;
+            border-color: #151714;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* Toast Notifications (Max 3) */
+        #toast-container {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            z-index: 9999;
+            pointer-events: none;
+            width: 300px;
+            max-width: calc(100vw - 40px);
+        }
+        .toast {
+            background-color: rgba(18, 24, 16, 0.95);
+            color: var(--text-main);
+            padding: 10px 14px;
+            border-radius: 2px;
+            border: 1px solid var(--army-border);
+            border-left: 5px solid var(--tactical-amber);
+            font-size: 0.85rem;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.6);
+            animation: slideInLeft 0.3s ease forwards, fadeOut 0.3s ease 2.7s forwards;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-family: monospace;
+        }
+        .toast.error { border-left-color: var(--tactical-red); }
+        
+        @keyframes slideInLeft {
+            from { opacity: 0; transform: translateX(-30px); }
+            to { opacity: 1; transform: translateX(0); }
+        }
+        @keyframes fadeOut {
+            from { opacity: 1; }
+            to { opacity: 0; }
+        }
     </style>
 </head>
-<body class="h-screen-dvh flex flex-col" style="padding:6px;gap:6px;">
+<body>
 
-    <!-- コンパクトヘッダー -->
-    <header class="glass-panel rounded-xl px-3 py-1.5 flex justify-between items-center z-50 shrink-0">
-        <div class="flex items-center gap-2">
-            <div class="w-7 h-7 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-500 flex items-center justify-center shrink-0">
-                <i class="fa-solid fa-tower-broadcast text-white text-xs"></i>
-            </div>
-            <p class="text-[11px] text-slate-400 font-mono flex items-center gap-1.5">
-                <span class="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse shrink-0"></span>
-                <span class="text-slate-500">ID:</span>
-                <span id="myIdDisplay" class="text-white select-all cursor-pointer hover:text-blue-400 transition-colors font-semibold">取得中...</span>
-            </p>
-        </div>
-        <div class="flex items-center gap-1.5">
-            <button id="toggleChatBtn" class="w-8 h-8 rounded-full glass-button relative flex items-center justify-center">
-                <i class="fa-solid fa-comments text-slate-300 text-sm"></i>
-                <span id="chatBadge" class="absolute top-0 right-0 bg-red-500 text-white text-[8px] font-bold w-3.5 h-3.5 rounded-full flex items-center justify-center hidden border border-slate-800">!</span>
-            </button>
-            <button id="openSettingsBtn" class="w-8 h-8 rounded-full glass-button flex items-center justify-center">
-                <i class="fa-solid fa-gear text-slate-300 text-sm"></i>
-            </button>
-        </div>
-    </header>
+<div id="toast-container"></div>
 
-    <!-- 着信モーダル -->
-    <div id="requestModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[100] flex items-center justify-center p-4 hidden">
-        <div class="glass-panel rounded-3xl p-8 w-full max-w-sm text-center animate-zoom border border-slate-700 shadow-2xl">
-            <div class="w-16 h-16 bg-blue-500/20 rounded-full flex items-center justify-center mx-auto mb-5 relative">
-                <div class="absolute inset-0 bg-blue-500/30 rounded-full animate-ping"></div>
-                <i class="fa-solid fa-phone-volume text-2xl text-blue-400"></i>
-            </div>
-            <h3 id="requestMsg" class="text-lg font-semibold mb-1 text-white">着信</h3>
-            <p class="text-xs text-slate-400 mb-6">相手からの接続を許可しますか？</p>
-            <div class="flex gap-3">
-                <button id="rejectBtn" class="flex-1 py-2.5 rounded-xl font-bold bg-slate-800 text-red-400 hover:bg-slate-700 transition-all text-sm">拒否</button>
-                <button id="acceptBtn" class="flex-1 py-2.5 rounded-xl font-bold bg-blue-600 text-white hover:bg-blue-500 transition-all text-sm">許可</button>
-            </div>
+<div class="app-container">
+    <div class="header">
+        <h1><span class="material-icons" style="font-size: 1.1rem; color: var(--tactical-amber);">radar</span> AN/PRC-100 COMM</h1>
+        <div class="status-container">
+            <span id="user-count" class="user-count">USERS: 0</span>
+            <div id="status-indicator" class="status-dot" title="未接続"></div>
         </div>
     </div>
 
-    <!-- 設定モーダル -->
-    <div id="settingsModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[60] flex items-center justify-center p-4 hidden">
-        <div class="glass-panel rounded-3xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto animate-zoom border border-slate-700 shadow-2xl">
-            <h2 class="text-lg font-bold mb-5 text-white flex items-center"><i class="fa-solid fa-sliders text-blue-500 mr-2"></i>設定</h2>
-            <div class="space-y-4">
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1.5">希望のID（空欄なら自動生成）</label>
-                    <input type="text" id="myCustomIdInput" placeholder="カスタムID" class="w-full rounded-xl px-4 py-2.5 text-sm">
-                </div>
-                <div>
-                    <label class="block text-xs font-semibold text-slate-400 mb-1.5">表示名</label>
-                    <input type="text" id="myNameInput" placeholder="あなたの名前" class="w-full rounded-xl px-4 py-2.5 text-sm">
-                </div>
-                <div class="border-t border-slate-700/50 pt-4">
-                    <label class="block text-xs font-semibold text-slate-400 mb-2">マイクデバイス</label>
-                    <select id="audioDeviceSelect" class="w-full rounded-xl px-4 py-2.5 text-sm mb-3 appearance-none"></select>
-                    <label class="flex items-center justify-between p-3 rounded-xl bg-slate-800/50 border border-slate-700 cursor-pointer hover:bg-slate-800 transition-colors">
-                        <div>
-                            <span class="text-sm font-semibold text-white block">Hi-Fi モード</span>
-                            <span class="text-[10px] text-slate-400">ノイズキャンセリング無効・音質優先</span>
-                        </div>
-                        <input type="checkbox" id="hifiModeCb" class="w-5 h-5 accent-blue-500 cursor-pointer">
-                    </label>
-                </div>
+    <div class="display-panel">
+        <div class="scope-overlay">
+            <div class="rx-label">RX (相手)</div>
+            <div class="tx-label">TX (自分)</div>
+        </div>
+        <canvas id="waveform"></canvas>
+    </div>
+
+    <div class="controls">
+        <div class="freq-block">
+            <div class="freq-header">
+                <span>FREQUENCY CONTROL</span>
+                <span style="color: var(--tactical-amber);">MHz</span>
             </div>
-            <div class="flex gap-3 mt-6">
-                <button id="closeSettingsBtn" class="flex-1 py-2.5 rounded-xl font-semibold bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all text-sm">キャンセル</button>
-                <button id="saveSettingsBtn" class="flex-1 py-2.5 rounded-xl font-semibold bg-blue-600 text-white hover:bg-blue-500 shadow-lg transition-all text-sm">保存して再起動</button>
+            
+            <div class="freq-adjust">
+                <button id="freq-down" class="btn-sm"><span class="material-icons">remove</span></button>
+                <div class="freq-selector">
+                    <span class="material-icons" style="color: var(--text-muted); font-size: 1.2rem;">tune</span>
+                    <input type="number" id="freq-input" min="1" max="10000" value="1234">
+                </div>
+                <button id="freq-up" class="btn-sm"><span class="material-icons">add</span></button>
             </div>
+        </div>
+
+        <div class="btn-group">
+            <button id="btn-connect" class="btn btn-connect">
+                <span class="material-icons" style="font-size: 1rem;">settings_input_antenna</span> 接続
+            </button>
+            <button id="btn-disconnect" class="btn btn-disconnect" disabled>
+                <span class="material-icons" style="font-size: 1rem;">power_off</span> 切断
+            </button>
         </div>
     </div>
 
-    <!-- メインエリア -->
-    <main class="flex-1 flex flex-col md:flex-row overflow-hidden relative" style="gap:6px;">
+    <div class="ptt-container">
+        <button id="ptt-btn" class="ptt-btn" disabled>
+            <span class="material-icons">mic</span>
+            PUSH TO TALK
+        </button>
+    </div>
+</div>
 
-        <!-- 映像エリア -->
-        <div class="flex-1 flex flex-col min-h-0 relative">
-            <div class="video-container">
-                <video id="remoteVideo" autoplay playsinline class="w-full h-full object-contain"></video>
+<script>
+    const PREFIX = "nanj-radio-mesh-v2-freq-";
+    let peer = null;
+    let myPeerId = null;
+    let localStream = null;
+    let isConnected = false;
+    
+    const connectedPeers = new Map(); 
 
-                <!-- 全画面ボタン -->
-                <button id="fullscreenBtn" class="w-9 h-9 rounded-full glass-button flex items-center justify-center">
-                    <i class="fa-solid fa-expand text-white text-sm"></i>
-                </button>
+    let audioCtx = null;
+    let rxAnalyser = null; 
+    let txAnalyser = null; 
+    let rxDataArray = null;
+    let txDataArray = null;
+    let animationId = null;
+    
+    const canvas = document.getElementById('waveform');
+    const canvasCtx = canvas.getContext('2d');
 
-                <div id="remoteMicBadge" class="absolute top-3 right-3 bg-red-500/90 text-white w-7 h-7 rounded-full flex items-center justify-center z-40 shadow hidden">
-                    <i class="fa-solid fa-microphone-slash text-xs"></i>
-                </div>
-                <div id="remoteMuteStatus" class="absolute inset-0 flex flex-col items-center justify-center bg-slate-900/95 hidden z-10 text-white">
-                    <div class="w-20 h-20 bg-slate-800 rounded-full flex items-center justify-center mb-4">
-                        <i class="fa-solid fa-video-slash text-3xl text-slate-500"></i>
-                    </div>
-                    <p class="text-sm text-slate-300">相手のカメラはオフです</p>
-                </div>
+    const freqInput = document.getElementById('freq-input');
+    const btnFreqDown = document.getElementById('freq-down');
+    const btnFreqUp = document.getElementById('freq-up');
+    const btnConnect = document.getElementById('btn-connect');
+    const btnDisconnect = document.getElementById('btn-disconnect');
+    const pttBtn = document.getElementById('ptt-btn');
+    const statusIndicator = document.getElementById('status-indicator');
+    const userCountEl = document.getElementById('user-count');
+    const toastContainer = document.getElementById('toast-container');
 
-                <!-- 自分映像 PIP -->
-                <div id="localVideoWrapper" class="hidden">
-                    <video id="localVideo" autoplay playsinline muted class="w-full h-full object-cover"></video>
-                    <div id="localMicBadge" class="absolute top-1.5 right-1.5 bg-red-500/90 text-white w-5 h-5 rounded-full flex items-center justify-center z-40 hidden">
-                        <i class="fa-solid fa-microphone-slash text-[9px]"></i>
-                    </div>
-                    <div id="localVideoOffIcon" class="absolute inset-0 flex items-center justify-center bg-slate-800 hidden">
-                        <i class="fa-solid fa-user text-white text-2xl opacity-25"></i>
-                    </div>
-                </div>
+    window.addEventListener('DOMContentLoaded', () => {
+        resizeCanvas();
+        window.addEventListener('resize', resizeCanvas);
+        
+        const savedFreq = localStorage.getItem('transceiver_freq') || "1234";
+        setFrequencyValue(savedFreq);
+        drawEmptyWaveform();
+        updateCountUI();
+    });
 
-                <div id="noVideoMsg" class="absolute inset-0 flex flex-col items-center justify-center z-0 bg-slate-900">
-                    <div class="animate-float text-center">
-                        <i id="statusIcon" class="fa-solid fa-satellite-dish text-5xl mb-5 text-slate-700"></i>
-                        <p class="text-xs font-medium tracking-widest text-slate-500 uppercase" id="mainStatusText">Waiting for connection</p>
-                    </div>
-                </div>
-            </div>
+    function resizeCanvas() {
+        canvas.width = canvas.parentElement.clientWidth - 24; 
+        canvas.height = canvas.parentElement.clientHeight - 16;
+    }
 
-            <!-- ボトムコントロール -->
-            <div class="absolute bottom-4 left-1/2 -translate-x-1/2 glass-panel rounded-full px-2 py-1.5 flex items-center gap-1.5 shadow-2xl z-50 w-[96%] max-w-xl">
-                <div id="connectInputWrapper" class="flex items-center gap-1.5 bg-slate-800/50 rounded-full px-3 py-1.5 flex-1 min-w-0">
-                    <i class="fa-solid fa-link text-slate-500 text-xs shrink-0"></i>
-                    <input type="text" id="targetIdInput" placeholder="相手のID..." class="bg-transparent border-none flex-1 text-sm outline-none text-white placeholder-slate-500 min-w-0">
-                </div>
-                <button id="connectBtn" class="bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all">接続</button>
+    function setFrequencyValue(val) {
+        let num = parseInt(val, 10);
+        if (isNaN(num)) num = 1;
+        if (num < 1) num = 1;
+        if (num > 10000) num = 10000;
+        freqInput.value = num;
+    }
 
-                <div id="mediaControls" class="hidden items-center gap-1.5">
-                    <button id="toggleMicBtn"    class="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300" disabled><i class="fa-solid fa-microphone text-sm"></i></button>
-                    <button id="toggleVideoBtn"  class="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300" disabled><i class="fa-solid fa-video text-sm"></i></button>
-                    <button id="switchCameraBtn" class="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300" disabled><i class="fa-solid fa-camera-rotate text-sm"></i></button>
-                    <button id="screenShareBtn"  class="w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-300" disabled><i class="fa-solid fa-display text-sm"></i></button>
-                    <button id="videoCallBtn" class="bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap transition-all disabled:opacity-50" disabled><i class="fa-solid fa-play mr-1.5"></i>開始</button>
-                </div>
-            </div>
-        </div>
+    freqInput.addEventListener('change', (e) => setFrequencyValue(e.target.value));
+    
+    btnFreqDown.addEventListener('click', () => {
+        setFrequencyValue(parseInt(freqInput.value) - 1);
+    });
+    btnFreqUp.addEventListener('click', () => {
+        setFrequencyValue(parseInt(freqInput.value) + 1);
+    });
 
-        <!-- チャットパネル -->
-        <div id="chatPanel" class="w-full md:w-72 glass-panel rounded-2xl flex flex-col shrink-0 overflow-hidden border border-slate-700/50">
-            <div class="px-4 py-2.5 border-b border-slate-700/50 bg-slate-800/30 flex justify-between items-center shrink-0">
-                <span class="font-bold text-sm text-white flex items-center"><i class="fa-solid fa-message text-blue-400 mr-2 text-xs"></i>Messages</span>
-                <button id="closeChatBtn" class="md:hidden w-7 h-7 rounded-full glass-button flex items-center justify-center text-slate-400"><i class="fa-solid fa-xmark text-xs"></i></button>
-            </div>
-            <div id="chatBox" class="chat-messages p-3 flex-1"></div>
-            <div class="p-2.5 bg-slate-800/50 border-t border-slate-700/50">
-                <form id="chatForm" class="flex gap-2 relative">
-                    <input type="text" id="chatInput" placeholder="メッセージ..." class="flex-1 rounded-full pl-4 pr-11 py-2 text-sm border border-slate-700 transition-all text-white" disabled>
-                    <button type="submit" id="sendBtn" class="absolute right-1 top-1 bottom-1 bg-blue-600 hover:bg-blue-500 text-white w-8 rounded-full disabled:opacity-50 transition-all flex items-center justify-center" disabled><i class="fa-solid fa-paper-plane text-xs"></i></button>
-                </form>
-            </div>
-        </div>
-    </main>
-
-    <script>
-        const STORAGE_KEY = 'p2p_v2_';
-        let peer, connection, currentCall, localStream, screenStream;
-        let isCameraOn = false, isMicMuted = false, isVideoMuted = false, isScreenSharing = false, isConnecting = false;
-        let currentFacingMode = 'user';
-        let lastTap = 0;
-
-        const config = {
-            id:       localStorage.getItem(STORAGE_KEY+'id')        || '',
-            name:     localStorage.getItem(STORAGE_KEY+'name')      || '名無しさん',
-            hifi:     localStorage.getItem(STORAGE_KEY+'hifi')      === 'true',
-            audioDev: localStorage.getItem(STORAGE_KEY+'audio_dev') || ''
-        };
-
-        const dom = {
-            chatPanel:  document.getElementById('chatPanel'),
-            chatBox:    document.getElementById('chatBox'),
-            reqModal:   document.getElementById('requestModal'),
-            reqMsg:     document.getElementById('requestMsg'),
-            btnConnect: document.getElementById('connectBtn'),
-            statusText: document.getElementById('mainStatusText'),
-            statusIcon: document.getElementById('statusIcon')
-        };
-
-        // ---- チャット ----
-        function toggleChat(force) {
-            dom.chatPanel.classList.toggle('open', force !== undefined ? force : !dom.chatPanel.classList.contains('open'));
-            document.getElementById('chatBadge').classList.add('hidden');
-        }
-        document.getElementById('toggleChatBtn').onclick = () => toggleChat();
-        document.getElementById('closeChatBtn').onclick  = () => toggleChat(false);
-
-        function addChat(text, isSelf, name) {
-            const w = document.createElement('div');
-            w.className = `flex flex-col mb-3 animate-zoom ${isSelf ? 'items-end' : 'items-start'}`;
-            w.innerHTML = `<span class="text-[10px] text-slate-500 mb-1 px-1">${name}</span><div class="message ${isSelf?'self':'peer'}">${text}</div>`;
-            dom.chatBox.appendChild(w); dom.chatBox.scrollTop = dom.chatBox.scrollHeight;
-        }
-        function addSysMsg(text) {
-            const w = document.createElement('div'); w.className = 'text-center my-3';
-            const p = document.createElement('span');
-            p.className = 'text-[11px] text-slate-400 bg-slate-800/80 border border-slate-700 py-1 px-3 rounded-full animate-zoom inline-block';
-            p.textContent = text; w.appendChild(p); dom.chatBox.appendChild(w);
-            dom.chatBox.scrollTop = dom.chatBox.scrollHeight;
+    function showToast(message, isError = false) {
+        while (toastContainer.children.length >= 3) {
+            toastContainer.firstChild.remove();
         }
 
-        // ---- UI 状態切替 ----
-        function enableRoomUI() {
-            isConnecting = false;
-            document.getElementById('chatInput').disabled = document.getElementById('sendBtn').disabled = false;
-            document.getElementById('targetIdInput').disabled = true;
-            document.getElementById('connectInputWrapper').classList.add('hidden');
-            document.getElementById('mediaControls').classList.remove('hidden');
-            document.getElementById('mediaControls').classList.add('flex');
-            dom.statusText.textContent = 'CONNECTED';
-            dom.statusText.className   = 'text-xs font-medium tracking-widest text-green-400 uppercase';
-            dom.statusIcon.className   = 'fa-solid fa-check-circle text-5xl mb-5 text-green-500 animate-zoom';
-            dom.btnConnect.textContent = '';
-            dom.btnConnect.innerHTML   = '<i class="fa-solid fa-power-off mr-1"></i>切断';
-            dom.btnConnect.className   = 'bg-red-500 hover:bg-red-400 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all';
-            document.getElementById('videoCallBtn').disabled = false;
-            if (connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
-        }
+        const toast = document.createElement('div');
+        toast.className = `toast ${isError ? 'error' : ''}`;
+        toast.innerHTML = `<span class="material-icons" style="font-size: 1rem;">${isError ? 'warning' : 'radar'}</span> ${message}`;
+        toastContainer.appendChild(toast);
+        
+        setTimeout(() => { if(toast.parentElement) toast.remove(); }, 3000);
+    }
 
-        function disableRoomUI() {
-            isConnecting = false;
-            document.getElementById('chatInput').disabled = document.getElementById('sendBtn').disabled = true;
-            document.getElementById('targetIdInput').disabled = false;
-            document.getElementById('connectInputWrapper').classList.remove('hidden');
-            document.getElementById('mediaControls').classList.add('hidden');
-            document.getElementById('mediaControls').classList.remove('flex');
-            dom.statusText.textContent = 'Waiting for connection';
-            dom.statusText.className   = 'text-xs font-medium tracking-widest text-slate-500 uppercase';
-            dom.statusIcon.className   = 'fa-solid fa-satellite-dish text-5xl mb-5 text-slate-700';
-            dom.btnConnect.innerHTML   = '<i class="fa-solid fa-link mr-1"></i>接続';
-            dom.btnConnect.className   = 'bg-green-500 hover:bg-green-400 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0 transition-all';
-            document.getElementById('videoCallBtn').disabled = true;
-            stopLocalStream();
-            if (connection) { connection.close(); connection = null; }
-            document.getElementById('remoteVideo').srcObject = null;
-            document.getElementById('remoteMuteStatus').classList.add('hidden');
-            document.getElementById('remoteMicBadge').classList.add('hidden');
-            document.getElementById('noVideoMsg').style.display = '';
+    async function initMic() {
+        if (localStream) return true;
+        try {
+            localStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+            localStream.getAudioTracks().forEach(track => track.enabled = false);
+            return true;
+        } catch (e) {
+            showToast("マイクアクセスの許可が必要です", true);
+            return false;
         }
+    }
 
-        // ---- PeerJS ----
-        function initPeer() {
-            const ice = { iceServers: [
-                { urls: 'stun:stun.l.google.com:19302' },
-                { urls: 'stun:stun1.l.google.com:19302' },
-                { urls: 'stun:stun2.l.google.com:19302' }
-            ]};
-            peer = config.id ? new Peer(config.id, { config: ice }) : new Peer({ config: ice });
-            peer.on('open', id => document.getElementById('myIdDisplay').textContent = id);
-            peer.on('error', err => {
-                const msg = err.type === 'peer-unavailable' ? '相手が見つかりません' : 'エラー: ' + err.type;
-                disableRoomUI(); addSysMsg(msg);
+    btnConnect.addEventListener('click', async () => {
+        const freq = parseInt(freqInput.value, 10);
+        btnConnect.disabled = true;
+        showToast("回線を初期化中...");
+        
+        const micReady = await initMic();
+        if (!micReady) { btnConnect.disabled = false; return; }
+
+        localStorage.setItem('transceiver_freq', freq);
+        const hostId = PREFIX + freq;
+
+        initVisualizerContext();
+        connectToMesh(hostId);
+    });
+
+    function connectToMesh(hostId) {
+        if (peer) peer.destroy();
+        peer = new Peer(); 
+
+        peer.on('open', (id) => {
+            myPeerId = id;
+            const dataConn = peer.connect(hostId);
+            
+            dataConn.on('open', () => {
+                showToast("周波数 " + freqInput.value + " MHz に同期しました");
+                setupDataConnection(dataConn, hostId);
+                const mediaCall = peer.call(hostId, localStream);
+                setupMediaCall(mediaCall, hostId);
+                updateUIConnected();
             });
-            peer.on('connection', conn => {
-                dom.reqMsg.innerHTML = `<span class="text-blue-400">${conn.metadata?.name || '相手'}</span> から着信`;
-                dom.reqModal.classList.remove('hidden');
-                document.getElementById('acceptBtn').onclick = () => {
-                    dom.reqModal.classList.add('hidden');
-                    const doAccept = () => {
-                        conn.send({ type: 'handshake_accept' });
-                        setupConnection(conn);
-                        enableRoomUI(); addSysMsg('相手が参加しました');
-                    };
-                    if (conn.open) doAccept(); else conn.on('open', doAccept);
-                };
-                document.getElementById('rejectBtn').onclick = () => { dom.reqModal.classList.add('hidden'); conn.close(); };
-            });
-            peer.on('call', call => {
-                if (connection && connection.peer === call.peer) {
-                    call.answer(localStream || null); handleCall(call);
-                } else call.close();
-            });
-        }
 
-        dom.btnConnect.onclick = () => {
-            if (connection && connection.open) {
-                connection.send({ type: 'system', action: 'disconnect' });
-                setTimeout(() => { disableRoomUI(); addSysMsg('切断しました'); }, 100);
-                return;
-            }
-            if (isConnecting) {
-                if (connection) { connection.close(); connection = null; }
-                disableRoomUI(); addSysMsg('キャンセルしました'); return;
-            }
-            const tid = document.getElementById('targetIdInput').value.trim(); if (!tid) return;
-            isConnecting = true;
-            document.getElementById('connectInputWrapper').classList.add('hidden');
-            dom.btnConnect.innerHTML = '<i class="fa-solid fa-spinner fa-spin mr-1"></i>待機';
-            dom.btnConnect.className = 'bg-yellow-500 text-white px-4 py-2 rounded-full text-xs font-bold whitespace-nowrap shrink-0';
-            connection = peer.connect(tid, { metadata: { name: config.name } });
-            connection.on('data',  data => { if (data.type === 'handshake_accept') { setupConnection(connection); enableRoomUI(); addSysMsg('接続確立しました'); } });
-            connection.on('error', ()   => { disableRoomUI(); addSysMsg('接続エラーが発生しました'); });
-            setTimeout(() => { if (isConnecting) { if (connection) { connection.close(); connection = null; } disableRoomUI(); addSysMsg('応答がありません'); } }, 15000);
-        };
-
-        function setupConnection(conn) {
-            connection = conn;
-            connection.on('close', () => { disableRoomUI(); addSysMsg('切断されました'); });
-            connection.on('error', () => { disableRoomUI(); addSysMsg('接続エラーが発生しました'); });
-            connection.on('data', data => {
-                if (data.type === 'chat') {
-                    addChat(data.text, false, data.name);
-                    if (!dom.chatPanel.classList.contains('open')) document.getElementById('chatBadge').classList.remove('hidden');
-                } else if (data.type === 'mute_status') {
-                    document.getElementById('remoteMuteStatus').classList.toggle('hidden', !data.video);
-                    document.getElementById('remoteMicBadge').classList.toggle('hidden', !data.audio);
-                } else if (data.type === 'system' && data.action === 'disconnect') {
-                    disableRoomUI(); addSysMsg('相手が退出しました');
+            peer.on('error', (err) => {
+                if (err.type === 'peer-unavailable') {
+                    becomeHost(hostId);
+                } else {
+                    showToast("接続エラー: " + err.type, true);
+                    resetUI();
                 }
             });
-        }
 
-        function handleCall(call) {
-            currentCall = call;
-            call.on('stream', stream => {
-                document.getElementById('remoteVideo').srcObject = stream;
-                document.getElementById('noVideoMsg').style.display = 'none';
-                document.getElementById('remoteMuteStatus').classList.add('hidden');
+            peer.on('connection', (conn) => setupDataConnection(conn, conn.peer));
+            peer.on('call', (call) => {
+                call.answer(localStream);
+                setupMediaCall(call, call.peer);
             });
-            call.on('close', () => {
-                document.getElementById('remoteVideo').srcObject = null;
-                document.getElementById('noVideoMsg').style.display = '';
-                document.getElementById('remoteMicBadge').classList.add('hidden');
-            });
-        }
-
-        // ---- 全画面 ----
-        document.getElementById('fullscreenBtn').onclick = toggleFullscreen;
-        document.querySelector('.video-container').addEventListener('touchend', e => {
-            const now = Date.now();
-            if (now - lastTap < 300) { e.preventDefault(); toggleFullscreen(); }
-            lastTap = now;
         });
-        function toggleFullscreen() {
-            const el = document.querySelector('.video-container');
-            const btn = document.getElementById('fullscreenBtn');
-            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
-                (el.requestFullscreen || el.webkitRequestFullscreen || function(){}).call(el);
-                btn.innerHTML = '<i class="fa-solid fa-compress text-white text-sm"></i>';
-            } else {
-                (document.exitFullscreen || document.webkitExitFullscreen || function(){}).call(document);
-                btn.innerHTML = '<i class="fa-solid fa-expand text-white text-sm"></i>';
-            }
-        }
-        ['fullscreenchange','webkitfullscreenchange'].forEach(ev =>
-            document.addEventListener(ev, () => {
-                if (!document.fullscreenElement && !document.webkitFullscreenElement)
-                    document.getElementById('fullscreenBtn').innerHTML = '<i class="fa-solid fa-expand text-white text-sm"></i>';
-            })
-        );
+    }
 
-        // ---- メディア ----
-        async function prepareStream(facingMode) {
-            const audioC = Object.assign(
-                config.audioDev ? { deviceId: { exact: config.audioDev } } : {},
-                { echoCancellation: !config.hifi, noiseSuppression: !config.hifi, autoGainControl: !config.hifi }
-            );
-            try {
-                localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: audioC });
-            } catch {
-                try { localStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode }, audio: true }); }
-                catch { alert('デバイスの起動に失敗しました。権限を確認してください。'); return; }
-            }
-            document.getElementById('localVideoWrapper').classList.remove('hidden');
-            document.getElementById('localVideo').srcObject = localStream;
-            updateToggleButtons();
-        }
+    function becomeHost(hostId) {
+        peer.destroy();
+        peer = new Peer(hostId);
+        
+        peer.on('open', (id) => {
+            myPeerId = id;
+            showToast("周波数 " + freqInput.value + " MHz を確保。待機中...");
+            updateUIConnected();
+            updateCountUI();
+        });
 
-        document.getElementById('switchCameraBtn').onclick = async () => {
-            if (!localStream || isScreenSharing) return;
-            currentFacingMode = currentFacingMode === 'user' ? 'environment' : 'user';
-            try {
-                const ns = await navigator.mediaDevices.getUserMedia({ video: { facingMode: currentFacingMode } });
-                const nv = ns.getVideoTracks()[0];
-                localStream.getVideoTracks().forEach(t => { t.stop(); localStream.removeTrack(t); });
-                localStream.addTrack(nv);
-                document.getElementById('localVideo').srcObject = localStream;
-                if (currentCall?.peerConnection) {
-                    const s = currentCall.peerConnection.getSenders().find(s => s.track?.kind === 'video');
-                    if (s) s.replaceTrack(nv);
-                }
-                nv.enabled = !isVideoMuted;
-            } catch { alert('カメラ切替に失敗しました。'); }
-        };
+        peer.on('connection', (conn) => {
+            conn.on('open', () => {
+                const existingPeers = Array.from(connectedPeers.keys());
+                conn.send({ type: 'peer-list', peers: existingPeers });
+                setupDataConnection(conn, conn.peer);
+            });
+        });
 
-        document.getElementById('screenShareBtn').onclick = async () => {
-            if (!currentCall) { alert('通話中のみ画面共有可能です。'); return; }
-            if (isScreenSharing) { stopScreenShare(); return; }
-            try {
-                screenStream = await navigator.mediaDevices.getDisplayMedia({ video: true, audio: true });
-                const st = screenStream.getVideoTracks()[0];
-                st.onended = () => stopScreenShare();
-                if (currentCall?.peerConnection) {
-                    const s = currentCall.peerConnection.getSenders().find(s => s.track?.kind === 'video');
-                    if (s) s.replaceTrack(st);
-                }
-                document.getElementById('localVideo').srcObject = screenStream;
-                document.getElementById('localVideo').classList.add('is-screen-share');
-                isScreenSharing = true; updateToggleButtons();
-            } catch { /* キャンセル */ }
-        };
+        peer.on('call', (call) => {
+            call.answer(localStream);
+            setupMediaCall(call, call.peer);
+        });
 
-        function stopScreenShare() {
-            if (!isScreenSharing) return;
-            isScreenSharing = false;
-            if (screenStream) { screenStream.getTracks().forEach(t => t.stop()); screenStream = null; }
-            document.getElementById('localVideo').classList.remove('is-screen-share');
-            if (localStream) {
-                const vt = localStream.getVideoTracks()[0];
-                if (currentCall?.peerConnection) {
-                    const s = currentCall.peerConnection.getSenders().find(s => s.track?.kind === 'video');
-                    if (s && vt) s.replaceTrack(vt);
-                }
-                document.getElementById('localVideo').srcObject = localStream;
-            }
-            updateToggleButtons();
-        }
+        peer.on('error', (err) => {
+            showToast("ホストエラー: " + err.type, true);
+            resetUI();
+        });
+    }
 
-        document.getElementById('videoCallBtn').onclick = async () => {
-            if (isCameraOn) { stopLocalStream(); return; }
-            await prepareStream(currentFacingMode);
-            if (!localStream) return;
-            isCameraOn = true;
-            document.getElementById('videoCallBtn').innerHTML = '<i class="fa-solid fa-stop mr-1.5"></i>停止';
-            document.getElementById('videoCallBtn').classList.add('btn-danger');
-            if (connection?.open) {
-                if (currentCall) currentCall.close();
-                currentCall = peer.call(connection.peer, localStream);
-                handleCall(currentCall);
-                connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
-            }
-        };
-
-        function stopLocalStream() {
-            if (isScreenSharing) stopScreenShare();
-            if (localStream) { localStream.getTracks().forEach(t => t.stop()); localStream = null; }
-            isCameraOn = isMicMuted = isVideoMuted = false;
-            document.getElementById('localVideoWrapper').classList.add('hidden');
-            document.getElementById('videoCallBtn').innerHTML = '<i class="fa-solid fa-play mr-1.5"></i>開始';
-            document.getElementById('videoCallBtn').classList.remove('btn-danger');
-            updateToggleButtons();
-            if (currentCall) { currentCall.close(); currentCall = null; }
-        }
-
-        function updateToggleButtons() {
-            const mBtn = document.getElementById('toggleMicBtn');
-            const vBtn = document.getElementById('toggleVideoBtn');
-            const cBtn = document.getElementById('switchCameraBtn');
-            const sBtn = document.getElementById('screenShareBtn');
-            if (localStream) {
-                mBtn.disabled = vBtn.disabled = sBtn.disabled = false; cBtn.disabled = isScreenSharing;
-                mBtn.className = `w-9 h-9 rounded-full glass-button flex items-center justify-center ${isMicMuted  ? 'btn-danger' : 'text-white'}`;
-                vBtn.className = `w-9 h-9 rounded-full glass-button flex items-center justify-center ${isVideoMuted ? 'btn-danger' : 'text-white'}`;
-                cBtn.className = `w-9 h-9 rounded-full glass-button flex items-center justify-center ${isScreenSharing ? 'opacity-40 text-slate-500' : 'text-white'}`;
-                sBtn.className = `w-9 h-9 rounded-full glass-button flex items-center justify-center ${isScreenSharing ? 'btn-active' : 'text-white'}`;
-                mBtn.innerHTML = `<i class="fa-solid fa-microphone${isMicMuted?'-slash':''} text-sm"></i>`;
-                vBtn.innerHTML = `<i class="fa-solid fa-video${isVideoMuted?'-slash':''} text-sm"></i>`;
-                document.getElementById('localMicBadge').classList.toggle('hidden', !isMicMuted);
-            } else {
-                [mBtn,vBtn,cBtn,sBtn].forEach(b => {
-                    b.disabled = true;
-                    b.className = 'w-9 h-9 rounded-full glass-button flex items-center justify-center text-slate-600';
+    function setupDataConnection(conn, peerId) {
+        conn.on('data', (data) => {
+            if (data.type === 'peer-list') {
+                data.peers.forEach(pId => {
+                    if (pId !== myPeerId && !connectedPeers.has(pId)) {
+                        const newConn = peer.connect(pId);
+                        setupDataConnection(newConn, pId);
+                        const newCall = peer.call(pId, localStream);
+                        setupMediaCall(newCall, pId);
+                    }
                 });
-                document.getElementById('localMicBadge').classList.add('hidden');
             }
-            document.getElementById('localVideoOffIcon').classList.toggle('hidden', !isVideoMuted || isScreenSharing);
+        });
+
+        conn.on('close', () => removePeer(peerId));
+
+        if (!connectedPeers.has(peerId)) {
+            connectedPeers.set(peerId, { data: conn });
+        } else {
+            connectedPeers.get(peerId).data = conn;
+        }
+        updateCountUI();
+    }
+
+    function setupMediaCall(call, peerId) {
+        call.on('stream', (stream) => {
+            const audio = new Audio();
+            audio.srcObject = stream;
+            audio.play().catch(e => console.error(e));
+            
+            const sourceNode = audioCtx.createMediaStreamSource(stream);
+            sourceNode.connect(rxAnalyser);
+
+            if (!connectedPeers.has(peerId)) {
+                connectedPeers.set(peerId, { call: call, audio: audio, sourceNode: sourceNode });
+            } else {
+                const p = connectedPeers.get(peerId);
+                p.call = call;
+                p.audio = audio;
+                p.sourceNode = sourceNode;
+            }
+        });
+
+        call.on('close', () => removePeer(peerId));
+    }
+
+    function removePeer(peerId) {
+        const p = connectedPeers.get(peerId);
+        if (p) {
+            if (p.audio) {
+                p.audio.pause();
+                p.audio.srcObject = null;
+            }
+            if (p.sourceNode) p.sourceNode.disconnect();
+            if (p.data) p.data.close();
+            if (p.call) p.call.close();
+            connectedPeers.delete(peerId);
+        }
+        updateCountUI();
+    }
+
+    function updateCountUI() {
+        if (!isConnected) {
+            userCountEl.innerText = "USERS: 0";
+            return;
+        }
+        userCountEl.innerText = `USERS: ${connectedPeers.size + 1}`;
+    }
+
+    function updateUIConnected() {
+        isConnected = true;
+        statusIndicator.classList.add('connected');
+        btnConnect.classList.add('active');
+        btnConnect.disabled = true;
+        btnDisconnect.disabled = false;
+        pttBtn.disabled = false;
+        freqInput.disabled = true;
+        btnFreqDown.disabled = true;
+        btnFreqUp.disabled = true;
+    }
+
+    function resetUI() {
+        isConnected = false;
+        if (peer) peer.destroy();
+        
+        connectedPeers.forEach((p, id) => removePeer(id));
+        connectedPeers.clear();
+
+        statusIndicator.classList.remove('connected');
+        btnConnect.classList.remove('active');
+        btnConnect.disabled = false;
+        btnDisconnect.disabled = true;
+        pttBtn.disabled = true;
+        freqInput.disabled = false;
+        btnFreqDown.disabled = false;
+        btnFreqUp.disabled = false;
+        updateCountUI();
+    }
+
+    btnDisconnect.addEventListener('click', () => {
+        resetUI();
+        showToast("通信を終了しました");
+    });
+
+    function startTalk(e) {
+        if(e) e.preventDefault();
+        if (!isConnected || !localStream) return;
+        localStream.getAudioTracks().forEach(track => track.enabled = true);
+        pttBtn.classList.add('active');
+    }
+
+    function stopTalk(e) {
+        if(e) e.preventDefault();
+        if (!localStream) return;
+        localStream.getAudioTracks().forEach(track => track.enabled = false);
+        pttBtn.classList.remove('active');
+    }
+
+    pttBtn.addEventListener('mousedown', startTalk);
+    pttBtn.addEventListener('mouseup', stopTalk);
+    pttBtn.addEventListener('mouseleave', stopTalk);
+    pttBtn.addEventListener('touchstart', startTalk, {passive: false});
+    pttBtn.addEventListener('touchend', stopTalk, {passive: false});
+    pttBtn.addEventListener('touchcancel', stopTalk, {passive: false});
+
+    function initVisualizerContext() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            if (audioCtx.state === 'suspended') audioCtx.resume();
+            
+            rxAnalyser = audioCtx.createAnalyser();
+            rxAnalyser.fftSize = 1024;
+            rxDataArray = new Uint8Array(rxAnalyser.frequencyBinCount);
+
+            txAnalyser = audioCtx.createAnalyser();
+            txAnalyser.fftSize = 1024;
+            txDataArray = new Uint8Array(txAnalyser.frequencyBinCount);
+
+            if (localStream) {
+                const localSource = audioCtx.createMediaStreamSource(localStream);
+                localSource.connect(txAnalyser);
+            }
+
+            drawWaveform();
+        }
+    }
+
+    function drawWaveform() {
+        animationId = requestAnimationFrame(drawWaveform);
+        
+        canvasCtx.fillStyle = '#050d05';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+
+        // 中央区切り線
+        canvasCtx.lineWidth = 1;
+        canvasCtx.strokeStyle = 'rgba(0, 255, 102, 0.2)';
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(0, canvas.height / 2);
+        canvasCtx.lineTo(canvas.width, canvas.height / 2);
+        canvasCtx.stroke();
+
+        if (!rxAnalyser || !txAnalyser) {
+            drawIdleLine(canvas.height * 0.25);
+            drawIdleLine(canvas.height * 0.75);
+            return;
         }
 
-        document.getElementById('toggleMicBtn').onclick = () => {
-            isMicMuted = !isMicMuted;
-            localStream.getAudioTracks().forEach(t => t.enabled = !isMicMuted);
-            updateToggleButtons();
-            if (connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
-        };
-        document.getElementById('toggleVideoBtn').onclick = () => {
-            isVideoMuted = !isVideoMuted;
-            localStream.getVideoTracks().forEach(t => t.enabled = !isVideoMuted);
-            updateToggleButtons();
-            if (connection) connection.send({ type: 'mute_status', video: isVideoMuted, audio: isMicMuted });
-        };
+        // 上段：RX (緑)
+        drawSingleLine(rxAnalyser, rxDataArray, canvas.height * 0.25, '#00ff66', (connectedPeers.size === 0));
 
-        document.getElementById('chatForm').onsubmit = e => {
-            e.preventDefault();
-            const text = document.getElementById('chatInput').value.trim();
-            if (!text || !connection) return;
-            connection.send({ type: 'chat', text, name: config.name });
-            addChat(text, true, config.name);
-            document.getElementById('chatInput').value = '';
-        };
+        // 下段：TX (オレンジ)
+        drawSingleLine(txAnalyser, txDataArray, canvas.height * 0.75, '#ffb300', false);
+    }
 
-        document.getElementById('openSettingsBtn').onclick = async () => {
-            document.getElementById('myCustomIdInput').value = config.id;
-            document.getElementById('myNameInput').value = config.name;
-            document.getElementById('hifiModeCb').checked = config.hifi;
-            try {
-                const devs = await navigator.mediaDevices.enumerateDevices();
-                const ins  = devs.filter(d => d.kind === 'audioinput');
-                document.getElementById('audioDeviceSelect').innerHTML = ins.length
-                    ? ins.map(d => `<option value="${d.deviceId}" ${d.deviceId===config.audioDev?'selected':''} class="bg-slate-800">${d.label||'マイク('+d.deviceId.slice(0,5)+'...)'}</option>`).join('')
-                    : '<option value="">デバイス取得不可</option>';
-            } catch { document.getElementById('audioDeviceSelect').innerHTML = '<option value="">取得失敗</option>'; }
-            document.getElementById('settingsModal').classList.remove('hidden');
-        };
-        document.getElementById('closeSettingsBtn').onclick = () => document.getElementById('settingsModal').classList.add('hidden');
-        document.getElementById('saveSettingsBtn').onclick  = () => {
-            localStorage.setItem(STORAGE_KEY+'id',        document.getElementById('myCustomIdInput').value.trim());
-            localStorage.setItem(STORAGE_KEY+'name',      document.getElementById('myNameInput').value.trim());
-            localStorage.setItem(STORAGE_KEY+'hifi',      document.getElementById('hifiModeCb').checked);
-            localStorage.setItem(STORAGE_KEY+'audio_dev', document.getElementById('audioDeviceSelect').value);
-            location.reload();
-        };
+    function drawSingleLine(analyser, dataArray, centerY, color, forceIdle) {
+        if (forceIdle) {
+            drawIdleLine(centerY, color);
+            return;
+        }
 
-        initPeer();
-    </script>
+        analyser.getByteTimeDomainData(dataArray);
+
+        canvasCtx.lineWidth = 2;
+        canvasCtx.strokeStyle = color;
+        canvasCtx.shadowBlur = 4;
+        canvasCtx.shadowColor = color;
+        canvasCtx.beginPath();
+
+        const sliceWidth = canvas.width * 1.0 / dataArray.length;
+        let x = 0;
+        const maxAmp = canvas.height / 4; 
+
+        for (let i = 0; i < dataArray.length; i++) {
+            const v = dataArray[i] / 128.0 - 1.0; 
+            const y = centerY + (v * maxAmp);
+            
+            if (i === 0) canvasCtx.moveTo(x, y);
+            else canvasCtx.lineTo(x, y);
+            x += sliceWidth;
+        }
+
+        canvasCtx.stroke();
+        canvasCtx.shadowBlur = 0;
+    }
+
+    function drawEmptyWaveform() {
+        canvasCtx.fillStyle = '#050d05';
+        canvasCtx.fillRect(0, 0, canvas.width, canvas.height);
+        
+        canvasCtx.lineWidth = 1;
+        canvasCtx.strokeStyle = 'rgba(0, 255, 102, 0.2)';
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(0, canvas.height / 2);
+        canvasCtx.lineTo(canvas.width, canvas.height / 2);
+        canvasCtx.stroke();
+
+        drawIdleLine(canvas.height * 0.25, '#00ff66');
+        drawIdleLine(canvas.height * 0.75, '#ffb300');
+    }
+
+    function drawIdleLine(centerY, color = 'rgba(0, 255, 102, 0.4)') {
+        canvasCtx.lineWidth = 1;
+        canvasCtx.strokeStyle = color;
+        canvasCtx.shadowBlur = 0;
+        canvasCtx.beginPath();
+        canvasCtx.moveTo(0, centerY);
+        canvasCtx.lineTo(canvas.width, centerY);
+        canvasCtx.stroke();
+    }
+</script>
+
 </body>
 </html>
