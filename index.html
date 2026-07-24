@@ -109,7 +109,7 @@
             box-shadow: 0 0 10px var(--tactical-green);
         }
 
-        /* Display Panel (Waveform / Scope) - 縦余白を吸収してダイナミックに伸縮 */
+        /* Display Panel (Waveform / Scope) - 比率固定: 4 */
         .display-panel {
             padding: 8px 12px;
             display: flex;
@@ -119,8 +119,8 @@
             background: #080a07;
             border-bottom: 2px solid var(--army-border);
             position: relative;
-            flex: 1;
-            min-height: 120px;
+            flex: 4;
+            min-height: 0;
         }
         
         canvas {
@@ -149,14 +149,16 @@
         .scope-overlay .rx-label { color: var(--tactical-green); }
         .scope-overlay .tx-label { color: var(--tactical-amber); }
 
-        /* Controls - 余計なすきまを排除してコンパクトに整列 */
+        /* Controls - 比率固定: 4 */
         .controls {
             padding: 10px;
             display: flex;
             flex-direction: column;
             gap: 10px;
             background: var(--army-panel);
-            flex-shrink: 0;
+            flex: 4;
+            min-height: 0;
+            justify-content: center;
         }
 
         .freq-block {
@@ -235,7 +237,6 @@
             margin: 0;
         }
 
-        /* 接続・切断ボタン（周波数入力欄のすぐ下に連続して配置） */
         .btn-group {
             display: flex;
             gap: 8px;
@@ -277,7 +278,7 @@
             cursor: not-allowed;
         }
 
-        /* PTT Switch */
+        /* PTT Switch - 比率固定: 3 */
         .ptt-container {
             padding: 10px 14px 14px 14px;
             display: flex;
@@ -285,11 +286,12 @@
             align-items: center;
             background: var(--army-dark);
             border-top: 2px solid var(--army-border);
-            flex-shrink: 0;
+            flex: 3;
+            min-height: 0;
         }
         .ptt-btn {
             width: 100%;
-            height: 120px; 
+            height: 100%;
             border-radius: 8px;
             background: linear-gradient(180deg, #4a5d35 0%, #2f3d20 100%);
             border: 6px solid #1a1d18;
@@ -326,7 +328,7 @@
             transform: none;
         }
 
-        /* Toast Notifications (Max 3) */
+        /* Toast Notifications */
         #toast-container {
             position: fixed;
             top: 20px;
@@ -533,10 +535,10 @@
             
             dataConn.on('open', () => {
                 showToast("周波数 " + freqInput.value + " MHz に同期しました");
+                updateUIConnected(); // 接続フラグを先にONにして人数更新に反映させる
                 setupDataConnection(dataConn, hostId);
                 const mediaCall = peer.call(hostId, localStream);
                 setupMediaCall(mediaCall, hostId);
-                updateUIConnected();
             });
 
             peer.on('error', (err) => {
@@ -563,8 +565,7 @@
         peer.on('open', (id) => {
             myPeerId = id;
             showToast("周波数 " + freqInput.value + " MHz を確保。待機中...");
-            updateUIConnected();
-            updateCountUI();
+            updateUIConnected(); // ここでも接続フラグをONにして人数を反映
         });
 
         peer.on('connection', (conn) => {
@@ -665,6 +666,9 @@
         freqInput.disabled = true;
         btnFreqDown.disabled = true;
         btnFreqUp.disabled = true;
+        
+        // フラグをtrueにした直後に人数を再計算して確実に反映させる
+        updateCountUI();
     }
 
     function resetUI() {
