@@ -100,7 +100,7 @@
             box-shadow: 0 0 10px var(--tactical-green);
         }
 
-        /* 波形ディスプレイ：キャンバス高さを160px固定に設定 */
+        /* 波形ディスプレイ：160pxに固定 */
         .display-panel {
             padding: 8px 14px;
             display: flex;
@@ -110,7 +110,7 @@
             background: #080a07;
             border-bottom: 2px solid var(--army-border);
             position: relative;
-            height: 176px; /* Canvas(160px) + Padding(16px) */
+            height: 176px; 
             flex-shrink: 0; 
         }
         
@@ -274,19 +274,24 @@
             cursor: not-allowed;
         }
 
-        /* PTT Switch：余白に応じてフレキシブルに広がる */
+        /* PTT & Handsfree Switch */
         .ptt-container {
             padding: 14px 16px 20px 16px;
             display: flex;
-            justify-content: center;
-            align-items: center;
             background: var(--army-dark);
             border-top: 2px solid var(--army-border);
             flex: 1; 
             min-height: 100px;
         }
-        .ptt-btn {
+        .ptt-wrapper {
+            display: flex;
+            gap: 12px;
             width: 100%;
+            height: 100%;
+        }
+
+        .ptt-btn {
+            flex: 1;
             height: 100%; 
             min-height: 90px;
             border-radius: 8px;
@@ -304,7 +309,7 @@
             justify-content: center;
             transition: all 0.1s;
             text-shadow: 0 2px 2px rgba(0,0,0,0.8);
-            letter-spacing: 3px;
+            letter-spacing: 2px;
         }
         .ptt-btn .material-icons {
             font-size: 3rem; 
@@ -317,6 +322,47 @@
             color: var(--tactical-amber);
         }
         .ptt-btn:disabled {
+            background: #2b302a;
+            color: #4d544c;
+            box-shadow: none;
+            border-color: #151714;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        /* 常にマイクオン（ハンズフリー）ボタン */
+        .handsfree-btn {
+            width: 70px;
+            height: 100%;
+            border-radius: 8px;
+            background: linear-gradient(180deg, #3a3f36 0%, #1f221c 100%);
+            border: 5px solid #151713;
+            box-shadow: 0 5px 0 #0d0f0c, inset 0 2px 4px rgba(255,255,255,0.1);
+            color: #6b7a67;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: all 0.1s;
+        }
+        .handsfree-btn .material-icons {
+            font-size: 2.2rem;
+            margin-bottom: 4px;
+        }
+        .handsfree-btn span.label {
+            font-size: 0.6rem;
+            font-weight: bold;
+            letter-spacing: 1px;
+        }
+        .handsfree-btn.active {
+            background: linear-gradient(180deg, #b37d00 0%, #805900 100%);
+            color: #fff;
+            box-shadow: 0 0 0 #0d0f0c, inset 0 5px 10px rgba(0,0,0,0.8);
+            transform: translateY(5px);
+            border-color: #332400;
+        }
+        .handsfree-btn:disabled {
             background: #2b302a;
             color: #4d544c;
             box-shadow: none;
@@ -415,10 +461,16 @@
     </div>
 
     <div class="ptt-container">
-        <button id="ptt-btn" class="ptt-btn" disabled>
-            <span class="material-icons">mic</span>
-            PUSH TO TALK
-        </button>
+        <div class="ptt-wrapper">
+            <button id="ptt-btn" class="ptt-btn" disabled>
+                <span class="material-icons">mic</span>
+                PUSH TO TALK
+            </button>
+            <button id="handsfree-btn" class="handsfree-btn" disabled title="常時送信(ハンズフリー)">
+                <span class="material-icons">lock</span>
+                <span class="label">LOCK</span>
+            </button>
+        </div>
     </div>
 </div>
 
@@ -428,6 +480,8 @@
     let myPeerId = null;
     let localStream = null;
     let isConnected = false;
+    let isHandsFree = false; // ハンズフリー状態フラグ
+    let currentFreq = 1234;  // 接続中の周波数
     
     const connectedPeers = new Map(); 
 
@@ -447,9 +501,25 @@
     const btnConnect = document.getElementById('btn-connect');
     const btnDisconnect = document.getElementById('btn-disconnect');
     const pttBtn = document.getElementById('ptt-btn');
+    const handsFreeBtn = document.getElementById('handsfree-btn');
     const statusIndicator = document.getElementById('status-indicator');
     const userCountEl = document.getElementById('user-count');
     const toastContainer = document.getElementById('toast-container');
+
+    // ラジオ音質用のディストーション（歪み）カーブを生成する関数
+    function makeDistortionCurve(amount) {
+        let k = typeof amount === 'number' ? amount : 50,
+            n_samples = 44100,
+            curve = new Float32Array(n_samples),
+            deg = Math.PI / 180,
+            i = 0,
+            x;
+        for ( ; i < n_samples; ++i ) {
+            x = i * 2 / n_samples - 1;
+            curve[i] = ( 3 + k ) * x * 20 * deg / ( Math.PI + k * Math.abs(x) );
+        }
+        return curve;
+    }
 
     window.addEventListener('DOMContentLoaded', () => {
         resizeCanvas();
@@ -463,7 +533,7 @@
 
     function resizeCanvas() {
         canvas.width = canvas.parentElement.clientWidth - 28; 
-        canvas.height = 160; // キャンバス描画高さを160pxに固定
+        canvas.height = 160;
     }
 
     function setFrequencyValue(val) {
@@ -510,6 +580,7 @@
 
     btnConnect.addEventListener('click', async () => {
         const freq = parseInt(freqInput.value, 10);
+        currentFreq = freq; // 接続時の周波数を記録（奇数・偶数判定用）
         btnConnect.disabled = true;
         showToast("回線を初期化中...");
         
@@ -609,22 +680,54 @@
         updateCountUI();
     }
 
+    // ★ ここで受信した音声のフィルタリング（ラジオ音質化）を行うンゴ！
     function setupMediaCall(call, peerId) {
         call.on('stream', (stream) => {
+            // Web Audio APIで鳴らすため、Audio要素自体はミュートにしておく（自動再生制約回避）
             const audio = new Audio();
             audio.srcObject = stream;
+            audio.muted = true; 
             audio.play().catch(e => console.error(e));
             
             const sourceNode = audioCtx.createMediaStreamSource(stream);
+            
+            // 波形描画用には生データを送る
             sourceNode.connect(rxAnalyser);
 
+            let lastNode = sourceNode;
+
+            // 奇数の周波数なら、ハイパス/ローパスフィルターと歪みをかけてラジオっぽい音質にする
+            if (currentFreq % 2 !== 0) {
+                const highpass = audioCtx.createBiquadFilter();
+                highpass.type = 'highpass';
+                highpass.frequency.value = 600; // 低音をカット
+
+                const lowpass = audioCtx.createBiquadFilter();
+                lowpass.type = 'lowpass';
+                lowpass.frequency.value = 2500; // 高音をカット
+
+                const distortion = audioCtx.createWaveShaper();
+                distortion.curve = makeDistortionCurve(10); // 少し歪ませる
+                distortion.oversample = '4x';
+
+                sourceNode.connect(highpass);
+                highpass.connect(lowpass);
+                lowpass.connect(distortion);
+                
+                lastNode = distortion;
+            }
+
+            // 最終的にスピーカーへ出力
+            lastNode.connect(audioCtx.destination);
+
             if (!connectedPeers.has(peerId)) {
-                connectedPeers.set(peerId, { call: call, audio: audio, sourceNode: sourceNode });
+                connectedPeers.set(peerId, { call: call, audio: audio, sourceNode: sourceNode, lastNode: lastNode });
             } else {
                 const p = connectedPeers.get(peerId);
                 p.call = call;
                 p.audio = audio;
                 p.sourceNode = sourceNode;
+                p.lastNode = lastNode;
             }
         });
 
@@ -639,6 +742,7 @@
                 p.audio.srcObject = null;
             }
             if (p.sourceNode) p.sourceNode.disconnect();
+            if (p.lastNode) p.lastNode.disconnect();
             if (p.data) p.data.close();
             if (p.call) p.call.close();
             connectedPeers.delete(peerId);
@@ -661,9 +765,15 @@
         btnConnect.disabled = true;
         btnDisconnect.disabled = false;
         pttBtn.disabled = false;
+        handsFreeBtn.disabled = false; // ロックボタン有効化
         freqInput.disabled = true;
         btnFreqDown.disabled = true;
         btnFreqUp.disabled = true;
+        
+        if(currentFreq % 2 !== 0) {
+            showToast("周波数(奇数)を検知。通信音質: ラジオモード", false);
+        }
+        
         updateCountUI();
     }
 
@@ -679,6 +789,13 @@
         btnConnect.disabled = false;
         btnDisconnect.disabled = true;
         pttBtn.disabled = true;
+        
+        // ハンズフリーもリセット
+        handsFreeBtn.disabled = true;
+        isHandsFree = false;
+        handsFreeBtn.classList.remove('active');
+        pttBtn.classList.remove('active');
+        
         freqInput.disabled = false;
         btnFreqDown.disabled = false;
         btnFreqUp.disabled = false;
@@ -690,16 +807,35 @@
         showToast("通信を終了しました");
     });
 
+    // ハンズフリー（常にマイクオン）ボタンの制御
+    handsFreeBtn.addEventListener('click', () => {
+        if (!isConnected || !localStream) return;
+        isHandsFree = !isHandsFree;
+        
+        if (isHandsFree) {
+            handsFreeBtn.classList.add('active');
+            pttBtn.classList.add('active'); // PTTボタンも押しっぱなしの見た目にする
+            localStream.getAudioTracks().forEach(track => track.enabled = true);
+            showToast("ハンズフリー(常時送信) をONにしました");
+        } else {
+            handsFreeBtn.classList.remove('active');
+            pttBtn.classList.remove('active');
+            localStream.getAudioTracks().forEach(track => track.enabled = false);
+            showToast("ハンズフリーをOFFにしました");
+        }
+    });
+
+    // PTTボタンの制御（ハンズフリー中はスキップ）
     function startTalk(e) {
         if(e) e.preventDefault();
-        if (!isConnected || !localStream) return;
+        if (!isConnected || !localStream || isHandsFree) return;
         localStream.getAudioTracks().forEach(track => track.enabled = true);
         pttBtn.classList.add('active');
     }
 
     function stopTalk(e) {
         if(e) e.preventDefault();
-        if (!localStream) return;
+        if (!localStream || isHandsFree) return;
         localStream.getAudioTracks().forEach(track => track.enabled = false);
         pttBtn.classList.remove('active');
     }
